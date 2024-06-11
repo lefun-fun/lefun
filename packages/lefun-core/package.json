@@ -1,6 +1,6 @@
 {
   "name": "@lefun/core",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Core library to make games for https://lefun.fun",
   "type": "module",
   "main": "dist/esm/index.js",

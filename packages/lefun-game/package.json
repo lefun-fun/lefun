@@ -1,6 +1,6 @@
 {
   "name": "@lefun/game",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Main dependency for writing game logic at https://lefun.fun.",
   "type": "module",
   "main": "dist/esm/index.js",
@@ -19,12 +19,12 @@
   },
   "author": "Simon Lemieux",
   "devDependencies": {
+    "@lefun/core": "workspace:^",
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@types/lodash-es": "^4.17.12",
     "@typescript-eslint/eslint-plugin": "^7.11.0",
     "@typescript-eslint/parser": "^7.11.0",
-    "@lefun/core": "workspace:^",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-simple-import-sort": "^12.1.0",
