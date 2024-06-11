@@ -1,0 +1,67 @@
+{
+  "name": "@lefun/ui",
+  "version": "1.0.0",
+  "description": "Utils for the UI of games",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/esm/index.js",
+  "types": "dist/types/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "default": "./dist/esm/index.js",
+      "types": "./dist/types/index.d.ts"
+    },
+    "./lefunExtractor": {
+      "import": "./dist/esm/lefunExtractor.js",
+      "default": "./dist/esm/lefunExtractor.js",
+      "types": "./dist/types/lefunExtractor.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "pnpm run clean && pnpm run compile",
+    "clean": "rm -rf ./dist",
+    "compile": "rollup --config",
+    "watch": "rollup --config --watch",
+    "format": "pnpm exec prettier --write . && pnpm exec eslint . --fix",
+    "check-format": "pnpm exec prettier --check . && pnpm exec eslint . --quiet"
+  },
+  "author": "Simon Lemieux",
+  "dependencies": {
+    "ws": "^8.3.0",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@lingui/cli": "^4.7.1",
+    "@lingui/macro": "^4.7.1",
+    "@rollup/plugin-commonjs": "^21.0.1",
+    "@rollup/plugin-node-resolve": "^13.0.6",
+    "@types/node": "^20.11.24",
+    "@types/react": "17.0.2",
+    "@types/react-dom": "17.0.2",
+    "@typescript-eslint/eslint-plugin": "^7.11.0",
+    "@typescript-eslint/parser": "^7.11.0",
+    "@lefun/core": "workspace:*",
+    "@lefun/game": "workspace:*",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-simple-import-sort": "^12.1.0",
+    "prettier": "^3.2.4",
+    "react": "17.0.2",
+    "react-dom": "17.0.2",
+    "rollup": "^2.60.1",
+    "rollup-plugin-typescript2": "^0.36.0",
+    "tslib": "^2.3.1",
+    "typescript": "^5.4.5"
+  },
+  "peerDependencies": {
+    "@lefun/core": "workspace:/*",
+    "@lefun/game": "workspace:^",
+    "react": "17.0.2",
+    "react-dom": "17.0.2"
+  }
+}
