@@ -1,3 +1,3 @@
 packages:
-  - packages/lefun-core
-  - packages/lefun-game
+  - packages/core
+  - packages/game
