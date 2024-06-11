@@ -1,0 +1,66 @@
+{
+  "name": "@lefun/dev-server",
+  "version": "1.0.4",
+  "type": "module",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "dist/index.js",
+      "types": "dist/types/index.d.ts"
+    },
+    "./index.css": "dist/index.css"
+  },
+  "scripts": {
+    "build": "pnpm run clean && pnpm run compile",
+    "clean": "rm -rf ./dist",
+    "compile": "rollup --config",
+    "watch": "rollup --config --watch",
+    "format": "pnpm exec prettier --write . && pnpm exec eslint . --fix",
+    "check-format": "pnpm exec prettier --check . && pnpm exec eslint . --quiet"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^11.1.5",
+    "@types/react": "17.0.2",
+    "@types/react-dom": "17.0.2",
+    "@typescript-eslint/eslint-plugin": "^7.11.0",
+    "@typescript-eslint/parser": "^7.11.0",
+    "autoprefixer": "^10.4.0",
+    "@lefun/ui": "workspace:*",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.6",
+    "eslint-plugin-simple-import-sort": "^12.1.0",
+    "postcss-cli": "^11.0.0",
+    "postcss-nested": "^5.0.6",
+    "react": "17.0.2",
+    "react-dom": "17.0.2",
+    "rollup": "^4.15.0",
+    "rollup-plugin-postcss": "^4.0.0",
+    "tailwindcss": "^3.4.3",
+    "typescript": "^5.4.5"
+  },
+  "peerDependencies": {
+    "@lefun/ui": "workspace:*",
+    "react": "17.0.2",
+    "react-dom": "17.0.2"
+  },
+  "dependencies": {
+    "@lingui/core": "^4.7.1",
+    "@lingui/react": "^4.7.1",
+    "classnames": "^2.3.1",
+    "immer": "^10.0.4",
+    "json-edit-react": "^1.8.1",
+    "zustand": "^4.5.2"
+  },
+  "postcss": {
+    "plugins": {
+      "tailwindcss": {},
+      "autoprefixer": {},
+      "postcss-nested": {}
+    }
+  }
+}
