@@ -1,7 +1,13 @@
 {
   "name": "@lefun/ui",
   "version": "1.0.4",
-  "description": "Utils for the UI of games",
+  "description": "Main dependency for writing the UI of games at https://lefun.com.",
+  "author": "Simon Lemieux",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lefun-fun/lefun",
+    "directory": "packages/ui"
+  },
   "license": "MIT",
   "type": "module",
   "main": "dist/esm/index.js",
@@ -29,7 +35,6 @@
     "format": "pnpm exec prettier --write . && pnpm exec eslint . --fix",
     "check-format": "pnpm exec prettier --check . && pnpm exec eslint . --quiet"
   },
-  "author": "Simon Lemieux",
   "dependencies": {
     "ws": "^8.3.0",
     "zustand": "^4.5.2"

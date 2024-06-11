@@ -2,6 +2,12 @@
   "name": "@lefun/core",
   "version": "1.0.4",
   "description": "Core library to make games for https://lefun.fun",
+  "author": "Simon Lemieux",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lefun-fun/lefun",
+    "directory": "packages/core"
+  },
   "license": "MIT",
   "type": "module",
   "main": "dist/esm/index.js",
