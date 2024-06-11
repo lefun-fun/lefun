@@ -61,7 +61,7 @@ importers:
         version: 4.17.21
     devDependencies:
       '@lefun/core':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../lefun-core
       '@rollup/plugin-commonjs':
         specifier: ^25.0.7
