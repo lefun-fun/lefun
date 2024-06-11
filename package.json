@@ -1,0 +1,11 @@
+{
+  "name": "lefun-root",
+  "version": "1.0.0",
+  "description": "Public packages to create games for lefun.fun",
+  "keywords": [],
+  "author": "Simon Lemieux",
+  "license": "MIT",
+  "dependencies": {
+    "lerna": "^8.1.3"
+  }
+}
