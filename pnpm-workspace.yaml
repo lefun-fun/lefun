@@ -2,4 +2,5 @@ packages:
   - packages/core
   - packages/game
   - packages/ui
+  - packages/ui-testing
   - packages/dev-server
