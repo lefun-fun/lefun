@@ -1,6 +1,6 @@
 {
   "name": "@lefun/core",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Core library to make games for https://lefun.fun",
   "license": "MIT",
   "type": "module",
