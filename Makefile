@@ -9,3 +9,8 @@ test:
 .PHONY: format
 format:
 	pnpm lerna run format
+
+.PHONY: publish
+publish:
+	pnpm lerna version
+	pnpm publish --access public --filter=!lefun-root
