@@ -491,7 +491,7 @@ async function render<B, PB, SB = EmptyObject>({
 
   // We import the CSS using the package name because this is what will be needed by packages importing this.
   // @ts-expect-error to make ts happy
-  await import("dev-server/index.css");
+  await import("@lefun/dev-server/index.css");
   let content = (
     <Main
       gameDef={gameDef}
