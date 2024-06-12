@@ -1,8 +1,7 @@
-import "react";
-
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { render as rtlRender, RenderResult } from "@testing-library/react";
+import { ReactNode } from "react";
 import { createStore } from "zustand";
 
 import { MatchState, setMakeMove, storeContext } from "@lefun/ui";
@@ -31,7 +30,7 @@ export const render = (
     messages: {},
   });
 
-  const wrapper = ({ children }) => {
+  const wrapper = ({ children }: { children: ReactNode }) => {
     return (
       <storeContext.Provider value={store}>
         <I18nProvider i18n={i18n}>{children}</I18nProvider>
