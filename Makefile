@@ -10,7 +10,10 @@ test:
 format:
 	pnpm lerna run format
 
+.PHONY: bump-version
+bump-version:
+	pnpm lerna version --force-publish
+
 .PHONY: publish
 publish:
-	pnpm lerna version --force-publish
 	pnpm publish --access public --filter=!lefun-root
