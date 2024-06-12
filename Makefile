@@ -15,5 +15,5 @@ bump-version:
 	pnpm lerna version --force-publish
 
 .PHONY: publish
-publish:
+publish: format build test
 	pnpm publish --access public --filter=!lefun-root
