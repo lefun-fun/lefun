@@ -1,6 +1,6 @@
 {
   "name": "@lefun/ui-testing",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Utils for testing the UI of games at https://lefun.fun.",
   "author": "Simon Lemieux",
   "repository": {
@@ -28,9 +28,9 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@lefun/ui": "workspace:*",
     "@lingui/core": "^4.7.1",
     "@lingui/react": "^4.7.1",
-    "@lefun/ui": "workspace:*",
     "@rollup/plugin-commonjs": "^21.0.1",
     "@rollup/plugin-node-resolve": "^13.0.6",
     "@types/react": "17.0.2",
@@ -48,9 +48,9 @@
     "typescript": "^5.4.5"
   },
   "peerDependencies": {
+    "@lefun/ui": "workspace:*",
     "@lingui/core": "^4.7.1",
     "@lingui/react": "^4.7.1",
-    "@lefun/ui": "workspace:*",
     "react": "17.0.2",
     "react-dom": "17.0.2"
   }

@@ -269,12 +269,6 @@ importers:
 
   packages/ui-testing:
     dependencies:
-      '@lingui/core':
-        specifier: ^4.7.1
-        version: 4.11.1
-      '@lingui/react':
-        specifier: ^4.7.1
-        version: 4.11.1(react@17.0.2)
       '@testing-library/react':
         specifier: ^12.1.2
         version: 12.1.5(react-dom@17.0.2)(react@17.0.2)
@@ -285,6 +279,12 @@ importers:
       '@lefun/ui':
         specifier: workspace:*
         version: link:../ui
+      '@lingui/core':
+        specifier: ^4.7.1
+        version: 4.11.1
+      '@lingui/react':
+        specifier: ^4.7.1
+        version: 4.11.1(react@17.0.2)
       '@rollup/plugin-commonjs':
         specifier: ^21.0.1
         version: 21.1.0(rollup@2.79.1)

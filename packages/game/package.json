@@ -1,6 +1,6 @@
 {
   "name": "@lefun/game",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Main dependency for writing game logic at https://lefun.fun.",
   "author": "Simon Lemieux",
   "repository": {
@@ -24,7 +24,6 @@
     "format": "pnpm exec prettier --write . && pnpm exec eslint . --fix",
     "check-format": "pnpm exec prettier --check . && pnpm exec eslint . --quiet"
   },
-  "author": "Simon Lemieux",
   "devDependencies": {
     "@lefun/core": "workspace:*",
     "@rollup/plugin-commonjs": "^25.0.7",

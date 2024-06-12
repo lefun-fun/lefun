@@ -1,6 +1,6 @@
 {
   "name": "@lefun/core",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Core library to make games for https://lefun.fun",
   "author": "Simon Lemieux",
   "repository": {
@@ -24,7 +24,6 @@
     "format": "pnpm exec prettier --write . && pnpm exec eslint . --fix",
     "check-format": "pnpm exec prettier --check . && pnpm exec eslint . --quiet"
   },
-  "author": "Simon Lemieux",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^21.0.1",
     "@rollup/plugin-node-resolve": "^13.0.6",
