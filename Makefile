@@ -12,5 +12,5 @@ format:
 
 .PHONY: publish
 publish:
-	pnpm lerna version
+	pnpm lerna version --force-publish
 	pnpm publish --access public --filter=!lefun-root
