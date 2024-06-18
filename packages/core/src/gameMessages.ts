@@ -1,7 +1,7 @@
 /*
  * We define here the keys used for the game messages for i18n.
  */
-export const gameMessageKeys = {
+export const gameMessageKeys: Record<string, (...args: any[]) => string> = {
   name() {
     return "lefun.name";
   },

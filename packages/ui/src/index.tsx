@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import { useStore as _useStore } from "zustand";
+import { StoreApi, useStore as _useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
 import type { MatchState as _MatchState, Move, UserId } from "@lefun/core";
@@ -17,7 +17,7 @@ export type MatchState<B, PB = EmptyObject> = _MatchState<B, PB> & {
 export type Selector<T, B, PB = EmptyObject> = (state: MatchState<B, PB>) => T;
 
 // TODO Type this properly
-export type Store = any;
+export type Store<B = unknown, PB = unknown> = StoreApi<MatchState<B, PB>>;
 
 export const storeContext = createContext<Store | null>(null);
 
@@ -36,6 +36,11 @@ export function useMakeMove(): (move: Move) => void {
     );
   }
   const store = useContext(storeContext);
+  if (store === null) {
+    throw new Error(
+      "Store is not defined, did you forget <storeContext.Provider>?",
+    );
+  }
   return _makeMove(store);
 }
 
@@ -49,11 +54,12 @@ export function useDispatch(): (move: Move) => void {
 /*
  * Main way to get data from the match state.
  */
-export function useSelector<T, B = EmptyObject, PB = EmptyObject>(
-  selector: Selector<T, B, PB>,
-): T {
+export function useSelector<T, B, PB>(selector: Selector<T, B, PB>): T {
   const store = useContext(storeContext);
-  return _useStore(store, selector);
+  if (store === null) {
+    throw new Error("Store is `null`, did you forget <storeContext.Provider>?");
+  }
+  return _useStore(store as Store<B, PB>, selector);
 }
 
 /*
@@ -80,7 +86,7 @@ export const useIsPlayer = <B, PB>() => {
 type TimeAdjust = "none" | "after" | "before";
 
 const toClientTime =
-  (delta, latency) =>
+  (delta: number, latency: number) =>
   (tsNumOrDate: number | Date, adjust: TimeAdjust = "none"): number => {
     let ts: number;
     if (typeof tsNumOrDate !== "number") {
@@ -149,7 +155,7 @@ export function getClientTime(
  * Util to play a sound
  */
 export const playSound = (name: string) => {
-  window.top.postMessage(
+  window.top?.postMessage(
     {
       type: "action",
       payload: { action: { type: "website/playSound", payload: { name } } },
@@ -163,7 +169,7 @@ export const playSound = (name: string) => {
  */
 export const useUsername = <B, PB>(userId?: UserId): string | undefined => {
   const username = useSelector((state: _MatchState<B, PB>) => {
-    return state.users.byId[userId]?.username;
+    return userId ? state.users.byId[userId]?.username : undefined;
   });
   return username;
 };

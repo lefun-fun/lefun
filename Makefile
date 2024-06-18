@@ -6,6 +6,10 @@ build:
 test:
 	pnpm lerna run test
 
+.PHONY: watch
+watch:
+	pnpm lerna run watch --stream --parallel
+
 .PHONY: format
 format:
 	pnpm lerna run format
