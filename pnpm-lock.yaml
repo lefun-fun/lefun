@@ -193,9 +193,6 @@ importers:
 
   packages/ui:
     dependencies:
-      ws:
-        specifier: ^8.3.0
-        version: 8.17.0
       zustand:
         specifier: ^4.5.2
         version: 4.5.2(@types/react@17.0.2)(immer@10.1.1)(react@17.0.2)
@@ -8409,19 +8406,6 @@ packages:
       sort-keys: 2.0.0
       type-fest: 0.4.1
       write-json-file: 3.2.0
-    dev: false
-
-  /ws@8.17.0:
-    resolution: {integrity: sha512-uJq6108EgZMAl20KagGkzCKfMEjxmKvZHG7Tlq0Z6nOky7YF7aq4mOx6xK8TJ/i1LeK4Qus7INktacctDgY8Ow==}
-    engines: {node: '>=10.0.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: '>=5.0.2'
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
     dev: false
 
   /xtend@4.0.2:

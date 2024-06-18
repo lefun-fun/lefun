@@ -36,7 +36,6 @@
     "check-format": "pnpm exec prettier --check . && pnpm exec eslint . --quiet"
   },
   "dependencies": {
-    "ws": "^8.3.0",
     "zustand": "^4.5.2"
   },
   "devDependencies": {
