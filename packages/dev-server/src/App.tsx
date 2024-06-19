@@ -14,7 +14,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { render as render_ } from "react-dom";
+import { createRoot } from "react-dom/client";
 import { createStore as _createStore, useStore as _useStore } from "zustand";
 
 import type { Locale, MatchSettings, UserId, UsersState } from "@lefun/core";
@@ -461,10 +461,9 @@ async function render<B, PB, SB = EmptyObject>({
   const userId = urlParams.get("u");
 
   function renderComponent(content: ReactNode) {
-    const element = document.getElementById(idName);
-
-    // TODO Why `as any`?
-    return render_(content as any, element);
+    const container = document.getElementById(idName);
+    const root = createRoot(container!);
+    return root.render(content);
   }
 
   // Is it the player's board?
