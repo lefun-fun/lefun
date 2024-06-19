@@ -38,15 +38,17 @@ type MatchState<B, PB> = {
 const BoardForPlayer = <B, PB>({
   board,
   userId,
-  locale,
   messages,
+  locale,
 }: {
   board: any;
   userId: UserId;
-  locale: Locale;
   messages: Record<string, string>;
+  locale: Locale;
 }) => {
-  i18n.loadAndActivate({ locale, messages });
+  useEffect(() => {
+    i18n.loadAndActivate({ locale, messages });
+  }, [locale, messages]);
 
   const [loading, setLoading] = useState(true);
   const storeRef = useRef<Store | null>(null);
@@ -221,7 +223,13 @@ function Settings<B, PB, SB>({
   visibleUserId: UserId;
   onSetVisibleUserId: (userId: UserId) => void;
   matchRef: RefObject<Match<B, PB, SB>>;
-  resetMatch: () => void;
+  resetMatch: ({
+    locale,
+    numPlayers,
+  }: {
+    locale: Locale;
+    numPlayers: number;
+  }) => void;
 }) {
   const toggleLayout = useStore((state) => state.toggleLayout);
   const toggleCollapsed = useStore((state) => state.toggleCollapsed);
@@ -230,6 +238,9 @@ function Settings<B, PB, SB>({
   const collapsed = useStore((state) => state.collapsed);
   const numPlayers = useStore((state) => state.numPlayers);
   const setNumPlayers = useStore((state) => state.setNumPlayers);
+  const locales = useStore((state) => state.locales);
+  const locale = useStore((state) => state.locale);
+  const setLocale = useStore((state) => state.setLocale);
 
   if (collapsed) {
     return (
@@ -249,6 +260,11 @@ function Settings<B, PB, SB>({
         <ButtonRow>
           <button onClick={toggleCollapsed}>{collapsed ? "◀" : "▶"}</button>
           <button onClick={() => toggleShowDimensions()}>? x ?</button>
+          {locales.map((locale) => (
+            <button key={locale} onClick={() => setLocale(locale)}>
+              {locale}
+            </button>
+          ))}
         </ButtonRow>
         <ButtonRow>
           {Array(numPlayers)
@@ -261,7 +277,6 @@ function Settings<B, PB, SB>({
                 {index}
               </button>
             ))}
-          <button> Spectator (Todo)</button>
           <button
             onClick={() => {
               if (visibleUserId !== "all") {
@@ -277,7 +292,7 @@ function Settings<B, PB, SB>({
         <ButtonRow>
           <button
             onClick={() => {
-              resetMatch();
+              resetMatch({ numPlayers, locale });
               window.location.reload();
             }}
           >
@@ -287,7 +302,9 @@ function Settings<B, PB, SB>({
         <ButtonRow>
           <button
             onClick={() => {
-              setNumPlayers(numPlayers + 1);
+              const newNumPlayers = numPlayers + 1;
+              setNumPlayers(newNumPlayers);
+              resetMatch({ numPlayers: newNumPlayers, locale });
               window.location.reload();
             }}
           >
@@ -295,7 +312,9 @@ function Settings<B, PB, SB>({
           </button>
           <button
             onClick={() => {
-              setNumPlayers(numPlayers - 1);
+              const newNumPlayers = numPlayers - 1;
+              setNumPlayers(newNumPlayers);
+              resetMatch({ numPlayers: newNumPlayers, locale });
               window.location.reload();
             }}
           >
@@ -317,18 +336,25 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
   matchSettings: MatchSettings;
   matchData?: any;
 }) {
-  const [loading, setLoading] = useState(true);
-
+  const locale = useStore((state) => state.locale);
   const layout = useStore((state) => state.layout);
-
   const numPlayers = useStore((state) => state.numPlayers);
 
+  const [loading, setLoading] = useState(true);
   const [visibleUserId, setVisibleUserId] = useState<UserId | "all">("all");
 
   const matchRef = useRef<Match<B, PB, SB> | null>(null);
 
   const resetMatch = useCallback(
-    ({ tryToLoad = true }: { tryToLoad?: boolean } = {}) => {
+    ({
+      locale,
+      numPlayers,
+      tryToLoad = false,
+    }: {
+      locale: Locale;
+      numPlayers: number;
+      tryToLoad?: boolean;
+    }) => {
       const userIds = Array(numPlayers)
         .fill(null)
         .map((_, i) => i.toString());
@@ -366,7 +392,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
           matchData,
           players,
           // This is the locale passed to initialBoards.
-          locale: "en",
+          locale,
         });
       }
 
@@ -374,16 +400,20 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
       (window as any).lefun.match = matchRef.current;
       saveMatch(match);
     },
-    [gameDef, matchData, matchSettings, numPlayers],
+    [gameDef, matchData, matchSettings],
   );
 
   const firstRender = useRef(true);
 
+  // Call the `resetMatch` callback the first time we render.
   useEffect(() => {
-    resetMatch({ tryToLoad: firstRender.current });
+    if (!firstRender.current) {
+      return;
+    }
+    resetMatch({ tryToLoad: true, locale, numPlayers });
     firstRender.current = false;
     setLoading(false);
-  }, [resetMatch]);
+  }, [resetMatch, locale, numPlayers]);
 
   const ref = useRef<HTMLDivElement>(null);
   const { width, height } = useSetDimensionCssVariablesOnResize(ref);
@@ -422,7 +452,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
                 )}
                 <iframe
                   className="z-0 absolute w-full h-full left-0 top-0"
-                  src={`${href}?u=${userId}`}
+                  src={`${href}?u=${userId}&l=${locale}`}
                 ></iframe>
               </div>
             );
@@ -435,12 +465,20 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
           visibleUserId={visibleUserId}
           onSetVisibleUserId={setVisibleUserId}
           matchRef={matchRef}
-          resetMatch={() => resetMatch({ tryToLoad: false })}
+          resetMatch={({
+            numPlayers,
+            locale,
+          }: {
+            numPlayers: number;
+            locale: Locale;
+          }) => resetMatch({ tryToLoad: false, numPlayers, locale })}
         />
       )}
     </div>
   );
 }
+
+type AllMessages = Record<string, Record<string, string>>;
 
 async function render<B, PB, SB = EmptyObject>({
   gameDef,
@@ -448,14 +486,14 @@ async function render<B, PB, SB = EmptyObject>({
   matchSettings,
   matchData,
   idName = "home",
-  messages = { fr: {}, en: {} },
+  messages = { en: {} },
 }: {
   gameDef: GameDef<B, PB, SB>;
   board: () => Promise<ReactNode>;
   matchSettings: MatchSettings;
   matchData?: any;
   idName?: string;
-  messages?: Record<string, Record<string, string>>;
+  messages?: AllMessages;
 }) {
   const urlParams = new URLSearchParams(window.location.search);
   const userId = urlParams.get("u");
@@ -468,15 +506,14 @@ async function render<B, PB, SB = EmptyObject>({
 
   // Is it the player's board?
   if (userId !== null) {
-    const locales = Object.keys(messages) as Locale[];
-    const locale = locales[0] || "en";
+    const locale = urlParams.get("l") as Locale;
 
     const content = (
       <BoardForPlayer
         board={await board()}
         userId={userId}
-        locale={locale}
         messages={messages[locale]}
+        locale={locale}
       />
     );
 
@@ -491,6 +528,7 @@ async function render<B, PB, SB = EmptyObject>({
   // We import the CSS using the package name because this is what will be needed by packages importing this.
   // @ts-expect-error to make ts happy
   await import("@lefun/dev-server/index.css");
+  const locales = (Object.keys(messages) || ["en"]) as Locale[];
   let content = (
     <Main
       gameDef={gameDef}
@@ -501,6 +539,7 @@ async function render<B, PB, SB = EmptyObject>({
 
   const store = createStore({
     numPlayers: gameDef.minPlayers,
+    locales,
   });
 
   content = (

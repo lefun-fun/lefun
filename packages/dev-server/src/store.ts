@@ -5,25 +5,38 @@
 import { createContext, useContext } from "react";
 import { createStore as _createStore, useStore as _useStore } from "zustand";
 
+import { Locale } from "@lefun/core";
+
 type State = {
   collapsed: boolean;
   layout: "row" | "column";
   numPlayers: number;
   userIds: string[];
   showDimensions: boolean;
+  locale: Locale;
+  locales: Locale[];
   toggleShowDimensions: () => void;
   toggleCollapsed: () => void;
   toggleLayout: () => void;
   setNumPlayers: (numPlayers: number) => void;
+  setLocale: (locale: Locale) => void;
 };
 
-function createStore({ numPlayers }: { numPlayers: number }) {
+function createStore({
+  numPlayers,
+  locales,
+}: {
+  numPlayers: number;
+  locales: Locale[];
+}) {
   const store = _createStore<State>()((set) => ({
     collapsed: false,
     layout: "row",
     numPlayers: 0,
     userIds: [],
     showDimensions: false,
+    locale: locales[0],
+    locales,
     //
     toggleShowDimensions: () =>
       set((state) => ({ showDimensions: !state.showDimensions })),
@@ -37,15 +50,27 @@ function createStore({ numPlayers }: { numPlayers: number }) {
         userIds: Array.from({ length: numPlayers }, (_, i) => i.toString()),
       });
     },
+    setLocale: (locale: Locale) => {
+      localStorage.setItem("locale", locale);
+      set({ locale });
+    },
   }));
 
-  const numPlayersStorage = localStorage.getItem("numPlayers");
-  if (numPlayersStorage) {
-    numPlayers = parseInt(numPlayersStorage);
+  {
+    const numPlayersStorage = localStorage.getItem("numPlayers");
+    if (numPlayersStorage) {
+      numPlayers = parseInt(numPlayersStorage);
+    }
+    const { setNumPlayers } = store.getState();
+    setNumPlayers(numPlayers);
   }
 
-  const { setNumPlayers } = store.getState();
-  setNumPlayers(numPlayers);
+  {
+    const localeStorage = localStorage.getItem("locale");
+    const locale = localeStorage ? localeStorage : locales[0];
+    const { setLocale } = store.getState();
+    setLocale(locale as Locale);
+  }
 
   return store;
 }
