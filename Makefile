@@ -12,12 +12,18 @@ watch:
 
 .PHONY: format
 format:
+	pnpm prettier packages --write
 	pnpm lerna run format
+
+.PHONY: check-format
+check-format:
+	pnpm prettier packages --check
+	pnpm lerna run check-format
 
 .PHONY: bump-version
 bump-version:
 	pnpm lerna version --force-publish
 
 .PHONY: publish
-publish: format build test
+publish: check-format build test
 	pnpm publish --access public --filter=!lefun-root

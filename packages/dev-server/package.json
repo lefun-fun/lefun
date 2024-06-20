@@ -24,8 +24,8 @@
     "clean": "rm -rf ./dist",
     "compile": "rollup --config",
     "watch": "rollup --config --watch",
-    "format": "pnpm exec prettier --write . && pnpm exec eslint . --fix",
-    "check-format": "pnpm exec prettier --check . && pnpm exec eslint . --quiet"
+    "format": "pnpm exec eslint . --fix",
+    "check-format": "pnpm exec eslint . --quiet"
   },
   "devDependencies": {
     "@lefun/core": "workspace:*",
