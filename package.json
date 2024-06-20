@@ -11,5 +11,6 @@
   "private": true,
   "devDependencies": {
     "prettier": "^3.3.2"
-  }
+  },
+  "packageManager": "pnpm@9.4.0"
 }
