@@ -151,6 +151,12 @@ const BoardForPlayer = <B, PB>({
   );
 };
 
+function getUserIds(numPlayers: number) {
+  return Array(numPlayers)
+    .fill(null)
+    .map((_, i) => i.toString());
+}
+
 /*
  * Deep copy an object.
  */
@@ -210,18 +216,42 @@ function MatchStateView<B, PB, SB>({
   );
 }
 
+const Button = ({
+  onClick,
+  children,
+  active = false,
+  disabled = false,
+}: {
+  onClick: () => void;
+  children: ReactNode;
+  active?: boolean;
+  disabled?: boolean;
+}) => {
+  return (
+    <button
+      onClick={() => onClick && onClick()}
+      className={classNames(
+        "p-1 border border-neutral-500 rounded-sm",
+        "min-w-10",
+        active
+          ? "bg-neutral-600 text-white hover:bg-neutral-700"
+          : "bg-neutral-200 text-black hover:bg-neutral-300",
+      )}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+};
+
 function ButtonRow({ children }: { children: ReactNode }) {
   return <div className="flex space-x-1">{children}</div>;
 }
 
 function Settings<B, PB, SB>({
-  visibleUserId,
-  onSetVisibleUserId,
   matchRef,
   resetMatch,
 }: {
-  visibleUserId: UserId;
-  onSetVisibleUserId: (userId: UserId) => void;
   matchRef: RefObject<Match<B, PB, SB>>;
   resetMatch: ({
     locale,
@@ -231,7 +261,7 @@ function Settings<B, PB, SB>({
     numPlayers: number;
   }) => void;
 }) {
-  const toggleLayout = useStore((state) => state.toggleLayout);
+  const setLayout = useStore((state) => state.setLayout);
   const toggleCollapsed = useStore((state) => state.toggleCollapsed);
   const toggleShowDimensions = useStore((state) => state.toggleShowDimensions);
   const layout = useStore((state) => state.layout);
@@ -241,11 +271,16 @@ function Settings<B, PB, SB>({
   const locales = useStore((state) => state.locales);
   const locale = useStore((state) => state.locale);
   const setLocale = useStore((state) => state.setLocale);
+  const setVisibleUserId = useStore((state) => state.setVisibleUserId);
+  const showDim = useStore((state) => state.showDimensions);
+  const visibleUserId = useStore((state) => state.visibleUserId);
+
+  const userIds = getUserIds(numPlayers);
 
   if (collapsed) {
     return (
       <div className="absolute right-0 top-0">
-        <button onClick={toggleCollapsed}>{"<"}</button>
+        <Button onClick={toggleCollapsed}>◀</Button>
       </div>
     );
   }
@@ -258,49 +293,61 @@ function Settings<B, PB, SB>({
     >
       <div className="flex flex-col gap-1 items-start justify-start">
         <ButtonRow>
-          <button onClick={toggleCollapsed}>{collapsed ? "◀" : "▶"}</button>
-          <button onClick={() => toggleShowDimensions()}>? x ?</button>
-          {locales.map((locale) => (
-            <button key={locale} onClick={() => setLocale(locale)}>
-              {locale}
-            </button>
+          <Button onClick={toggleCollapsed}>▶</Button>
+          <Button onClick={() => toggleShowDimensions()} active={showDim}>
+            ? x ?
+          </Button>
+          {locales.map((otherLocale) => (
+            <Button
+              key={otherLocale}
+              onClick={() => setLocale(otherLocale)}
+              active={otherLocale === locale}
+            >
+              {otherLocale}
+            </Button>
           ))}
         </ButtonRow>
         <ButtonRow>
-          {Array(numPlayers)
-            .fill(null)
-            .map((_, index) => (
-              <button
-                key={index}
-                onClick={() => onSetVisibleUserId(index.toString())}
-              >
-                {index}
-              </button>
-            ))}
-          <button
+          {userIds.map((userId) => (
+            <Button
+              key={userId}
+              onClick={() => setVisibleUserId(userId)}
+              active={visibleUserId === userId}
+            >
+              {userId}
+            </Button>
+          ))}
+          <Button
             onClick={() => {
-              if (visibleUserId !== "all") {
-                onSetVisibleUserId("all");
-              } else {
-                toggleLayout();
-              }
+              setVisibleUserId("all");
+              setLayout("row");
             }}
+            active={visibleUserId === "all" && layout === "row"}
           >
-            {layout === "row" ? "||" : "="}
-          </button>
+            ||
+          </Button>
+          <Button
+            onClick={() => {
+              setVisibleUserId("all");
+              setLayout("column");
+            }}
+            active={visibleUserId === "all" && layout === "column"}
+          >
+            =
+          </Button>
         </ButtonRow>
         <ButtonRow>
-          <button
+          <Button
             onClick={() => {
               resetMatch({ numPlayers, locale });
               window.location.reload();
             }}
           >
             Reset Game State
-          </button>
+          </Button>
         </ButtonRow>
         <ButtonRow>
-          <button
+          <Button
             onClick={() => {
               const newNumPlayers = numPlayers + 1;
               setNumPlayers(newNumPlayers);
@@ -309,8 +356,8 @@ function Settings<B, PB, SB>({
             }}
           >
             Add Player
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => {
               const newNumPlayers = numPlayers - 1;
               setNumPlayers(newNumPlayers);
@@ -319,7 +366,7 @@ function Settings<B, PB, SB>({
             }}
           >
             Remove Player
-          </button>
+          </Button>
         </ButtonRow>
       </div>
       <MatchStateView<B, PB, SB> matchRef={matchRef} />
@@ -338,10 +385,10 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
 }) {
   const locale = useStore((state) => state.locale);
   const layout = useStore((state) => state.layout);
+  const visibleUserId = useStore((state) => state.visibleUserId);
   const numPlayers = useStore((state) => state.numPlayers);
 
   const [loading, setLoading] = useState(true);
-  const [visibleUserId, setVisibleUserId] = useState<UserId | "all">("all");
 
   const matchRef = useRef<Match<B, PB, SB> | null>(null);
 
@@ -355,9 +402,8 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
       numPlayers: number;
       tryToLoad?: boolean;
     }) => {
-      const userIds = Array(numPlayers)
-        .fill(null)
-        .map((_, i) => i.toString());
+      const userIds = getUserIds(numPlayers);
+
       let match: Match<B, PB, SB> | null = null;
 
       if (tryToLoad) {
@@ -391,7 +437,6 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
           matchPlayersSettings,
           matchData,
           players,
-          // This is the locale passed to initialBoards.
           locale,
         });
       }
@@ -424,10 +469,6 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
     return <div>Loading</div>;
   }
 
-  const userIds = Array(numPlayers)
-    .fill(null)
-    .map((_, i) => i.toString());
-
   return (
     <div className="h-full w-full relative flex">
       <div
@@ -436,7 +477,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
           layout === "row" ? "flex-row" : "flex-col",
         )}
       >
-        {userIds.map((userId) => {
+        {getUserIds(numPlayers).map((userId) => {
           if (visibleUserId === "all" || visibleUserId === userId) {
             const { href } = window.location;
             return (
@@ -462,8 +503,6 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
       </div>
       {matchRef && (
         <Settings<B, PB, SB>
-          visibleUserId={visibleUserId}
-          onSetVisibleUserId={setVisibleUserId}
           matchRef={matchRef}
           resetMatch={({
             numPlayers,

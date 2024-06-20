@@ -12,12 +12,6 @@
     @apply h-full w-full m-0 overflow-hidden;
     font-size: 16px;
   }
-
-  button {
-    @apply p-1 border border-neutral-500 bg-neutral-200 rounded-sm;
-    @apply hover:bg-neutral-300;
-    @apply min-w-10;
-  }
 }
 
 #home {

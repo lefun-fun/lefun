@@ -5,22 +5,48 @@
 import { createContext, useContext } from "react";
 import { createStore as _createStore, useStore as _useStore } from "zustand";
 
-import { Locale } from "@lefun/core";
+import type { Locale, UserId } from "@lefun/core";
+
+const KEYS_TO_LOCAL_STORAGE: (keyof State)[] = [
+  "numPlayers",
+  "visibleUserId",
+  "locale",
+  "showDimensions",
+  "layout",
+  "collapsed",
+];
+
+type Layout = "row" | "column";
 
 type State = {
   collapsed: boolean;
-  layout: "row" | "column";
+  layout: Layout;
+  visibleUserId: UserId | "all";
   numPlayers: number;
-  userIds: string[];
   showDimensions: boolean;
   locale: Locale;
   locales: Locale[];
   toggleShowDimensions: () => void;
   toggleCollapsed: () => void;
-  toggleLayout: () => void;
+  setLayout: (layout: Layout) => void;
   setNumPlayers: (numPlayers: number) => void;
   setLocale: (locale: Locale) => void;
+  setVisibleUserId: (userId: UserId | "all") => void;
 };
+
+function saveToLocalStorage(state: Partial<State>): void {
+  const obj = {} as any;
+  for (const key of KEYS_TO_LOCAL_STORAGE) {
+    obj[key] = state[key];
+  }
+
+  localStorage.setItem("state", JSON.stringify(obj));
+}
+
+function loadFromLocalStorage(store: ReturnType<typeof createStore>) {
+  const obj = JSON.parse(localStorage.getItem("state") || "{}");
+  store.setState(obj);
+}
 
 function createStore({
   numPlayers,
@@ -32,45 +58,39 @@ function createStore({
   const store = _createStore<State>()((set) => ({
     collapsed: false,
     layout: "row",
-    numPlayers: 0,
-    userIds: [],
+    numPlayers,
+    visibleUserId: "all",
     showDimensions: false,
     locale: locales[0],
     locales,
     //
-    toggleShowDimensions: () =>
-      set((state) => ({ showDimensions: !state.showDimensions })),
-    toggleCollapsed: () => set((state) => ({ collapsed: !state.collapsed })),
-    toggleLayout: () =>
-      set((state) => ({ layout: state.layout === "row" ? "column" : "row" })),
+    toggleShowDimensions: () => {
+      set((state) => ({ showDimensions: !state.showDimensions }));
+      saveToLocalStorage(store.getState());
+    },
+    toggleCollapsed: () => {
+      set((state) => ({ collapsed: !state.collapsed }));
+      saveToLocalStorage(store.getState());
+    },
+    setLayout: (layout: Layout) => {
+      set({ layout });
+      saveToLocalStorage(store.getState());
+    },
     setNumPlayers: (numPlayers) => {
-      localStorage.setItem("numPlayers", numPlayers.toString());
-      set({
-        numPlayers,
-        userIds: Array.from({ length: numPlayers }, (_, i) => i.toString()),
-      });
+      set({ numPlayers });
+      saveToLocalStorage(store.getState());
     },
     setLocale: (locale: Locale) => {
-      localStorage.setItem("locale", locale);
       set({ locale });
+      saveToLocalStorage(store.getState());
+    },
+    setVisibleUserId: (userId: UserId | "all") => {
+      set({ visibleUserId: userId });
+      saveToLocalStorage(store.getState());
     },
   }));
 
-  {
-    const numPlayersStorage = localStorage.getItem("numPlayers");
-    if (numPlayersStorage) {
-      numPlayers = parseInt(numPlayersStorage);
-    }
-    const { setNumPlayers } = store.getState();
-    setNumPlayers(numPlayers);
-  }
-
-  {
-    const localeStorage = localStorage.getItem("locale");
-    const locale = localeStorage ? localeStorage : locales[0];
-    const { setLocale } = store.getState();
-    setLocale(locale as Locale);
-  }
+  loadFromLocalStorage(store);
 
   return store;
 }
