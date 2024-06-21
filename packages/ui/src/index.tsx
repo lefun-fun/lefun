@@ -62,6 +62,18 @@ export function useSelector<T, B, PB>(selector: Selector<T, B, PB>): T {
   return _useStore(store as Store<B, PB>, selector);
 }
 
+/* Util to "curry" the types of useSelector<...> */
+export const makeUseSelector =
+  <B, PB = EmptyObject>() =>
+  <T,>(selector: Selector<T, B, PB>) =>
+    useSelector<T, B, PB>(selector);
+
+/* Util to "curry" the types of useSelectorShallow<...> */
+export const makeUseSelectorShallow =
+  <B, PB = EmptyObject>() =>
+  <T,>(selector: Selector<T, B, PB>) =>
+    useSelectorShallow<T, B, PB>(selector);
+
 /*
  * Same as `useSelector` but will use a shallow equal on the output to decide if a render
  * is required or not.

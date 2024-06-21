@@ -1,6 +1,12 @@
+.PHONY: init
+init:
+	pnpm install
+	cd game-template && pnpm install
+
 .PHONY: build
 build:
 	pnpm lerna run build
+	cd game-template && pnpm -r build
 
 .PHONY: test
 test:

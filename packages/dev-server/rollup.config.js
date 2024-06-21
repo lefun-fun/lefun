@@ -4,17 +4,15 @@ import typescript from "@rollup/plugin-typescript";
 import postcss from "rollup-plugin-postcss";
 
 export default {
-  input: {
-    index: "src/index.ts",
-  },
+  input: "src/index.ts",
   output: {
     dir: "dist",
     format: "esm",
     sourcemap: true,
   },
   plugins: [
-    commonjs(),
     nodeResolve(),
+    commonjs(),
     typescript({ tsconfig: "./tsconfig.json" }),
     postcss({ extract: true }),
   ],
@@ -25,5 +23,6 @@ export default {
     "@lefun/game",
     "react",
     "react-dom",
+    "@lefun/dev-server/index.css",
   ],
 };

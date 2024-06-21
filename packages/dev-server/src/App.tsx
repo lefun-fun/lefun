@@ -519,17 +519,17 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
 
 type AllMessages = Record<string, Record<string, string>>;
 
-async function render<B, PB, SB = EmptyObject>({
+async function render<B, PB = EmptyObject, SB = EmptyObject>({
   gameDef,
   board,
-  matchSettings,
+  matchSettings = {},
   matchData,
   idName = "home",
   messages = { en: {} },
 }: {
   gameDef: GameDef<B, PB, SB>;
   board: () => Promise<ReactNode>;
-  matchSettings: MatchSettings;
+  matchSettings?: MatchSettings;
   matchData?: any;
   idName?: string;
   messages?: AllMessages;
@@ -565,7 +565,7 @@ async function render<B, PB, SB = EmptyObject>({
   (window as any).lefun = {};
 
   // We import the CSS using the package name because this is what will be needed by packages importing this.
-  // @ts-expect-error to make ts happy
+  // @ts-expect-error Make typescript happy.
   await import("@lefun/dev-server/index.css");
   const locales = (Object.keys(messages) || ["en"]) as Locale[];
   let content = (
