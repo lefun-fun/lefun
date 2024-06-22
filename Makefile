@@ -30,4 +30,4 @@ bump-version:
 
 .PHONY: publish
 publish: check-format build test
-	pnpm publish --access public --filter=!lefun-root
+	pnpm publish --access public --filter=@lefun/*
