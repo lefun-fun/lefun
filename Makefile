@@ -1,12 +1,10 @@
 .PHONY: init
 init:
 	pnpm install
-	cd game-template && pnpm install
 
 .PHONY: build
 build:
 	pnpm lerna run build
-	cd game-template && pnpm -r build
 
 .PHONY: test
 test:
@@ -28,7 +26,7 @@ check-format:
 
 .PHONY: bump-version
 bump-version:
-	pnpm lerna version --force-publish
+	pnpm lerna version --force-publish --no-private
 
 .PHONY: publish
 publish: check-format build test

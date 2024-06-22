@@ -5,6 +5,7 @@
   "author": "Simon Lemieux",
   "license": "MIT",
   "type": "module",
+  "private": true,
   "main": "dist/index.js",
   "types": "dist/types/index.d.ts",
   "scripts": {
@@ -15,9 +16,9 @@
   },
   "devDependencies": {
     "@babel/preset-react": "^7.24.7",
-    "@lefun/core": "link:../../packages/core",
-    "@lefun/dev-server": "link:../../packages/dev-server",
-    "@lefun/ui": "link:../../packages/ui",
+    "@lefun/core": "workspace:*",
+    "@lefun/dev-server": "workspace:*",
+    "@lefun/ui": "workspace:*",
     "@lingui/cli": "^4.11.1",
     "@lingui/conf": "^4.11.1",
     "@lingui/macro": "^4.11.1",
@@ -43,8 +44,8 @@
     "roll-game": "workspace:*"
   },
   "peerDependencies": {
-    "@lefun/core": "^1.1.3",
-    "@lefun/ui": "^1.1.3",
+    "@lefun/core": "workspace:*",
+    "@lefun/ui": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   }

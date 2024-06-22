@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Game logic for the minimal example game 'Roll'",
   "author": "Simon Lemieux",
+  "private": true,
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
@@ -12,15 +13,15 @@
     "watch": "pnpm rollup --config --watch"
   },
   "devDependencies": {
-    "@lefun/core": "link:../../packages/core",
-    "@lefun/game": "link:../../packages/game",
+    "@lefun/core": "workspace:*",
+    "@lefun/game": "workspace:*",
     "@rollup/plugin-typescript": "^11.1.6",
     "rollup": "^4.18.0",
     "tslib": "^2.6.3",
     "typescript": "^5.5.2"
   },
   "peerDependencies": {
-    "@lefun/core": "^1.1.3",
-    "@lefun/game": "^1.1.3"
+    "@lefun/core": "workspace:*",
+    "@lefun/game": "workspace:*"
   }
 }

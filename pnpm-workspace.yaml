@@ -4,3 +4,6 @@ packages:
   - packages/ui
   - packages/ui-testing
   - packages/dev-server
+  #
+  - game-template/game
+  - game-template/ui
