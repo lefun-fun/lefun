@@ -5,29 +5,28 @@ import {
   Locale,
   MatchPlayersSettings,
   MatchSettings,
-  Move,
   User,
   UserId,
 } from "@lefun/core";
-import { GameDef, Random } from "@lefun/game";
+import { GameDef, GameStateBase, PlayerMove, Random } from "@lefun/game";
 
 type EmptyObject = Record<string, never>;
 
-type State<B, PB, SB> = {
-  board: B;
-  playerboards: Record<UserId, PB | EmptyObject>;
-  secretboard: SB | EmptyObject;
+type State<GS extends GameStateBase> = {
+  board: GS["B"];
+  playerboards: Record<UserId, GS["PB"] | EmptyObject>;
+  secretboard: GS["SB"] | EmptyObject;
 };
 
-class Match<B, PB, SB> extends EventTarget {
+class Match<GS extends GameStateBase> extends EventTarget {
   userIds: UserId[];
   random: Random;
-  gameDef: GameDef<B, PB, SB>;
+  gameDef: GameDef<GS>;
 
   // Store that represents the backend.
   // We need to put it in a zustand Store because we want the JSON view in the right
   // panel to refresh with changes of state.
-  store: StoreApi<State<B, PB, SB>>;
+  store: StoreApi<State<GS>>;
 
   // Note some of the constructors parameters in case we want to reset.
   matchData: any;
@@ -37,8 +36,8 @@ class Match<B, PB, SB> extends EventTarget {
     gameDef,
     userIds,
   }: {
-    state: State<B, PB, SB>;
-    gameDef: GameDef<B, PB, SB>;
+    state: State<GS>;
+    gameDef: GameDef<GS>;
     userIds: UserId[];
   });
   constructor({
@@ -50,7 +49,7 @@ class Match<B, PB, SB> extends EventTarget {
     locale,
   }: {
     players: Record<UserId, User>;
-    gameDef: GameDef<B, PB, SB>;
+    gameDef: GameDef<GS>;
     matchSettings: MatchSettings;
     matchPlayersSettings: MatchPlayersSettings;
     matchData?: any;
@@ -67,12 +66,12 @@ class Match<B, PB, SB> extends EventTarget {
     userIds,
   }: {
     players?: Record<UserId, User>;
-    gameDef: GameDef<B, PB, SB>;
+    gameDef: GameDef<GS>;
     matchSettings?: MatchSettings;
     matchPlayersSettings?: MatchPlayersSettings;
     matchData?: any;
     locale?: Locale;
-    state?: State<B, PB, SB>;
+    state?: State<GS>;
     userIds?: UserId[];
   }) {
     super();
@@ -83,7 +82,7 @@ class Match<B, PB, SB> extends EventTarget {
     this.gameDef = gameDef;
     this.userIds = userIds || [];
 
-    this.store = createStore(() => (state || {}) as State<B, PB, SB>);
+    this.store = createStore(() => (state || {}) as State<GS>);
 
     if (!state) {
       if (!players) {
@@ -131,7 +130,7 @@ class Match<B, PB, SB> extends EventTarget {
     }
   }
 
-  makeMove(userId: UserId, move: Move) {
+  makeMove(userId: UserId, move: PlayerMove) {
     const now = new Date().getTime();
 
     // Here the `store` is the store for the player making the move, since
@@ -145,7 +144,8 @@ class Match<B, PB, SB> extends EventTarget {
     }
 
     const { name, payload } = move;
-    const { executeNow, execute } = this.gameDef.moves[name];
+
+    const { executeNow, execute } = this.gameDef.playerMoves[name];
 
     const patchesByUserId: Record<UserId, Patch[]> = Object.fromEntries(
       this.userIds.map((userId) => [userId, []]),
@@ -153,16 +153,16 @@ class Match<B, PB, SB> extends EventTarget {
 
     if (executeNow) {
       // Also run `executeNow` on the local state.
-      this.store.setState((state: State<B, PB, SB>) => {
+      this.store.setState((state: State<GS>) => {
         const [newState, patches] = produceWithPatches(
           state,
-          (draft: Draft<State<B, PB, SB>>) => {
+          (draft: Draft<State<GS>>) => {
             const { board, playerboards } = draft;
             executeNow({
               payload,
               userId,
-              board: board as B,
-              playerboard: playerboards[userId] as PB,
+              board: board as GS["B"],
+              playerboard: playerboards[userId] as GS["PB"],
               delayMove: () => {
                 console.warn("delayMove not implemented yet");
                 return { ts: 0 };
@@ -178,23 +178,23 @@ class Match<B, PB, SB> extends EventTarget {
 
     if (execute) {
       const { store, random } = this;
-      store.setState((state: State<B, PB, SB>) => {
+      store.setState((state: State<GS>) => {
         const [newState, patches] = produceWithPatches(
           state,
           (
             draft: Draft<{
-              board: B;
-              playerboards: Record<UserId, PB>;
-              secretboard: SB;
+              board: GS["B"];
+              playerboards: Record<UserId, GS["PB"]>;
+              secretboard: GS["SB"];
             }>,
           ) => {
             const { board, playerboards, secretboard } = draft;
             execute({
               payload,
               userId,
-              board: board as B,
-              playerboards: playerboards as Record<UserId, PB>,
-              secretboard: secretboard as SB,
+              board: board as GS["B"],
+              playerboards: playerboards as Record<UserId, GS["PB"]>,
+              secretboard: secretboard as GS["SB"],
               gameData: undefined,
               random,
               ts: now,
@@ -263,16 +263,14 @@ function separatePatchesByUser(
 }
 
 /* Save match to localStorage */
-function saveMatch<B, PB, SB>(match: Match<B, PB, SB>) {
+function saveMatch(match: Match<any>) {
   const state = match.store.getState();
   const userIds = match.userIds;
   localStorage.setItem("match", JSON.stringify({ state, userIds }));
 }
 
 /* Load match from localStorage */
-function loadMatch<B, PB, SB>(
-  gameDef: GameDef<B, PB, SB>,
-): Match<B, PB, SB> | null {
+function loadMatch(gameDef: GameDef<any>): Match<any> | null {
   const data = localStorage.getItem("match");
   if (!data) {
     return null;
