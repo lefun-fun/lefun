@@ -1,5 +1,11 @@
 import { UserId } from "@lefun/core";
-import { createMove, GameDef, GameMoves, PlayerMove } from "@lefun/game";
+import {
+  // createMove,
+  GameDef,
+  GameMove,
+  GameMoves,
+  PlayerMove,
+} from "@lefun/game";
 
 type Player = {
   isRolling: boolean;
@@ -59,5 +65,15 @@ const game = {
   minPlayers: 1,
   maxPlayers: 10,
 } satisfies GameDef<GS, GM>;
+
+// const move = {
+//   name: "moveWithArg",
+//   payload: { someArg: 123 },
+// } satisfies GameMove<GS, GM>;
+
+// const move2 = {
+//   name: "roll",
+//   payload: { someArg: 123 },
+// } satisfies GameMove<GS, GM>;
 
 export { GS, GM, roll, game };

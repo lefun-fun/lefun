@@ -31,17 +31,6 @@ export type GameStateDefault<B, PB = EmptyObject, SB = EmptyObject> = {
   SB: SB;
 };
 
-// type GameMoves<GS extends GameState> = Record<string, PlayerMove<GS>> & {
-// INIT_MOVE?: PlayerMove<GS>;
-// };
-//
-// type GameMovesGeneric<
-// GS extends GameState,
-// M extends Record<string, PlayerMove<GS>>,
-// > = Record<K, PlayerMove<GS>>;
-
-// export type GameStateDefault = { B: never; PB: never; SB: never };
-
 type EmptyObject = Record<string, never>;
 
 // We provide a default payload for when we don't need one (for example for moves
@@ -131,7 +120,7 @@ export type Execute<G extends GameState, P> = (
   options: ExecuteOptions<G, P>,
 ) => void;
 
-export type PlayerMove<G extends GameState, P> = {
+export type PlayerMove<G extends GameState, P = EmptyObject> = {
   canDo?: (options: {
     userId: UserId;
     board: G["B"];
@@ -240,7 +229,7 @@ type GetAgent<B, PB> = (arg0: {
 }) => Promise<Agent<B, PB>>;
 
 // export type AgentGetMoveRet<K extends string, P> = {
-export type AgentGetMoveRet<GS extends GameState, GM extends GameMoves<any>> = {
+export type AgentGetMoveRet<GS extends GameState, GM extends GameMoves<GS>> = {
   // The `move` that should be performed.
   move: GameMove<GS, GM>;
   // Some info used for training.
@@ -281,13 +270,24 @@ export type MoveName<GS extends GameState, GM extends GameMoves<GS>> = Extract<
   string
 >;
 
-type ExtractPayload<PM> = PM extends PlayerMove<GameState, infer P> ? P : never;
+// type ExtractPayload<PM> = PM extends PlayerMove<any, infer P> ? P : never;
+// type ExtractPayload<
+//   GS extends GameState,
+//   GM extends GameMoves<GS>,
+//   K extends string,
+// > = GM[K] extends PlayerMove<any, infer P> ? P : never;
+
+// type IsNeverType<T> = [T] extends [never] ? true : never;
+// type TypeCond<T, U> = [T] extends [never] ? { a: U } : { b: U };
+
+// type IsEmptyObject<Obj extends Record<PropertyKey, unknown>> =
+// [keyof Obj] extends [never] ? true : false
 
 export type MovePayload<
   GS extends GameState,
   GM extends GameMoves<GS>,
   K extends MoveName<GS, GM>,
-> = ExtractPayload<GM[K]>;
+> = GM[K] extends PlayerMove<GS, infer P> ? P : never;
 
 export type GameMove<
   GS extends GameState,

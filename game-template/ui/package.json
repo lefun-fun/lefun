@@ -10,6 +10,7 @@
   "types": "dist/types/index.d.ts",
   "scripts": {
     "build": "rm -rf ./dist && pnpm rollup --config",
+    "watch": "pnpm rollup --config --watch",
     "dev": "pnpm vite --host",
     "lingui:compile": "pnpm lingui compile",
     "lingui:extract": "pnpm lingui extract"
