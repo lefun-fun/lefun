@@ -5,12 +5,13 @@ import { useShallow } from "zustand/react/shallow";
 import type { MatchState as _MatchState, UserId } from "@lefun/core";
 import type {
   // GameDef,
-  GameMove,
+  // GameMove,
   GameMoves,
+  GameMoveWithOptionalPayload,
   GameState,
   GameStateDefault,
   MoveName,
-  MovePayload,
+  // MovePayload,
   // FIXME make sure we rename these
   // GameStateDefault,
   // MoveName,
@@ -49,14 +50,6 @@ export const storeContext = createContext<Store<UnknownGameType> | null>(null);
 // let _makeMove: (store: Store) => MakeMove;
 // type AnyGameState = GameStateDefault<any, any, any>
 
-type GameMoveWithOptionalPayload<
-  GS extends GameState,
-  GM extends GameMoves<GS>,
-  K extends MoveName<GS, GM>,
-> = [MovePayload<GS, GM, K>[keyof MovePayload<GS, GM, K>]] extends [never]
-  ? Optional<GameMove<GS, GM, K>, "payload">
-  : GameMove<GS, GM, K>;
-
 let _makeMove: <
   GS extends GameState,
   GM extends GameMoves<GS>,
@@ -67,7 +60,11 @@ let _makeMove: <
 
 // export function setMakeMove<GS extends GameState, GM extends GameMoves<GS>>(
 export function setMakeMove(
-  makeMove: <GS extends GameState, GM extends GameMoves<GS>, K extends MoveName<GS, GM>>(
+  makeMove: <
+    GS extends GameState,
+    GM extends GameMoves<GS>,
+    K extends MoveName<GS, GM>,
+  >(
     move: GameMoveWithOptionalPayload<GS, GM, K>,
     store: Store<UnknownGameType>,
   ) => void,
@@ -82,14 +79,11 @@ export function setMakeMove(
 // type IsEmpty<T> = [T[keyof T]] extends [never] ? true : false;
 
 // ? Optional<GameMove<GS, GM, K>, "payload">
-type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
 export function useMakeMove<GS extends GameState, GM extends GameMoves<GS>>(): <
   K extends MoveName<GS, GM>,
 >(
-  move: [MovePayload<GS, GM, K>[keyof MovePayload<GS, GM, K>]] extends [never]
-    ? Optional<GameMove<GS, GM, K>, "payload">
-    : GameMove<GS, GM, K>,
+  move: GameMoveWithOptionalPayload<GS, GM, K>,
 ) => void {
   if (!_makeMove) {
     throw new Error(

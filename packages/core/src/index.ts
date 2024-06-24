@@ -12,7 +12,7 @@ import { UserId } from "./types";
 export type AnyMove = {
   name: string;
   payload: unknown;
-}
+};
 
 export type AkaType = "similar" | "aka" | "inspired" | "original";
 

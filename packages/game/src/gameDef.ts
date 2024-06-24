@@ -270,26 +270,13 @@ export type MoveName<GS extends GameState, GM extends GameMoves<GS>> = Extract<
   string
 >;
 
-// type ExtractPayload<PM> = PM extends PlayerMove<any, infer P> ? P : never;
-// type ExtractPayload<
-//   GS extends GameState,
-//   GM extends GameMoves<GS>,
-//   K extends string,
-// > = GM[K] extends PlayerMove<any, infer P> ? P : never;
-
-// type IsNeverType<T> = [T] extends [never] ? true : never;
-// type TypeCond<T, U> = [T] extends [never] ? { a: U } : { b: U };
-
-// type IsEmptyObject<Obj extends Record<PropertyKey, unknown>> =
-// [keyof Obj] extends [never] ? true : false
-
 export type MovePayload<
   GS extends GameState,
   GM extends GameMoves<GS>,
   K extends MoveName<GS, GM>,
 > = GM[K] extends PlayerMove<GS, infer P> ? P : never;
 
-export type GameMove<
+type GameMove<
   GS extends GameState,
   GM extends GameMoves<GS>,
   K extends MoveName<GS, GM> = MoveName<GS, GM>,
@@ -298,14 +285,18 @@ export type GameMove<
   payload: MovePayload<GS, GM, K>;
 };
 
+type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
+
+export type GameMoveWithOptionalPayload<
+  GS extends GameState,
+  GM extends GameMoves<GS>,
+  K extends MoveName<GS, GM>,
+> = [MovePayload<GS, GM, K>[keyof MovePayload<GS, GM, K>]] extends [never]
+  ? Optional<GameMove<GS, GM, K>, "payload">
+  : GameMove<GS, GM, K>;
+
 // This is what the game developer must implement.
-export type GameDef<
-  G extends GameState,
-  GM extends GameMoves<G>,
-  // M, // extends Record<string, PlayerMove<G>>,
-  // K extends string,// = string,
-  // M extends Moves<G>, //, K>// = Moves<G, string>,
-> = {
+export type GameDef<G extends GameState, GM extends GameMoves<G>> = {
   initialBoards: (options: InitialBoardsOptions<G["B"]>) => {
     board: G["B"];
     playerboards?: Record<UserId, G["PB"]>;

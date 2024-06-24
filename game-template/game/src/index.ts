@@ -1,8 +1,6 @@
 import { UserId } from "@lefun/core";
 import {
-  // createMove,
   GameDef,
-  GameMove,
   GameMoves,
   PlayerMove,
 } from "@lefun/game";
@@ -25,30 +23,28 @@ type GS = {
   SB: EmptyObject;
 };
 
-const roll = {
-  executeNow({ board, userId }) {
-    board.players[userId].isRolling = true;
-  },
-  execute({ board, userId, random, payload, playerboards }) {
-    board.players[userId].diceValue = random.d6();
-    board.players[userId].isRolling = false;
-  },
-} satisfies PlayerMove<GS, EmptyObject>;
-
-type Payload = { someArg: number };
+type MoveWithArgPayload = { someArg: number };
 
 const moveWithArg = {
   execute({ board, userId, payload }) {
     //
   },
-} satisfies PlayerMove<GS, Payload>;
+} satisfies PlayerMove<GS, MoveWithArgPayload>;
+
+const roll = {
+  executeNow({ board, userId }) {
+    board.players[userId].isRolling = true;
+  },
+  execute({ board, userId, random, playerboards }) {
+    board.players[userId].diceValue = random.d6();
+    board.players[userId].isRolling = false;
+  },
+} satisfies PlayerMove<GS, EmptyObject>;
 
 const moves = {
-  roll,
   moveWithArg,
-} satisfies GameMoves<GS>;
-
-// type RollGameDef = GameDef<G, typeof moves>;
+  roll,
+}
 
 type GM = typeof moves;
 
@@ -66,14 +62,4 @@ const game = {
   maxPlayers: 10,
 } satisfies GameDef<GS, GM>;
 
-// const move = {
-//   name: "moveWithArg",
-//   payload: { someArg: 123 },
-// } satisfies GameMove<GS, GM>;
-
-// const move2 = {
-//   name: "roll",
-//   payload: { someArg: 123 },
-// } satisfies GameMove<GS, GM>;
-
-export { GS, GM, roll, game };
+export { GS, GM, game };

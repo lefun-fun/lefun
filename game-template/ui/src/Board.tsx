@@ -10,11 +10,9 @@ import {
   makeUseMakeMove,
 } from "@lefun/ui";
 
-import { GS, GM, roll } from "roll-game";
+import { GS, GM } from "roll-game";
 
 import { Trans } from "@lingui/macro";
-
-// type B = _Board;
 
 // Dice symbol characters
 const DICE = ["", "\u2680", "\u2681", "\u2682", "\u2683", "\u2684", "\u2685"];

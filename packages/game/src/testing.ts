@@ -24,10 +24,11 @@ import {
   delayedMove,
   GameDef,
   GameDef_,
-  GameMove,
   GameMoves,
+  GameMoveWithOptionalPayload,
   GameState,
   Move,
+  MoveName,
   // GameType,
   // INIT_MOVE,
   // initMove,
@@ -370,9 +371,9 @@ export class MatchTester<GS extends GameState, GM extends GameMoves<GS>> {
     this._isPlaying = false;
   }
 
-  async makeMoveAndContinue(
+  async makeMoveAndContinue<K extends MoveName<GS, GM>>(
     userId: UserId,
-    move: GameMove<GS, GM>,
+    move: GameMoveWithOptionalPayload<GS, GM, K>,
     { canFail = false }: { canFail?: boolean } = {},
   ) {
     this.makeMove(userId, move, { canFail });
@@ -468,9 +469,9 @@ export class MatchTester<GS extends GameState, GM extends GameMoves<GS>> {
     }
   }
 
-  makeMove(
+  makeMove<K extends MoveName<GS, GM>>(
     userId: UserId,
-    move: GameMove<GS, GM>,
+    move: GameMoveWithOptionalPayload<GS, GM, K>,
     { canFail = false }: { canFail?: boolean } = {},
   ) {
     const { name, payload } = move;
