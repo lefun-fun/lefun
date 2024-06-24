@@ -1,7 +1,7 @@
 import { sample, sampleSize, shuffle } from "lodash-es";
 
 export class Random {
-  shuffled(array: any[]): any[] {
+  shuffled<T>(array: T[]): T[] {
     // Use loadash for this one.
     return shuffle(array);
   }

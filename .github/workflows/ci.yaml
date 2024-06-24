@@ -5,22 +5,21 @@ name: Build, Check Format and Test
 
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: pnpm/action-setup@v4
-    - name: Install Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
-        cache: 'pnpm'
-    - run: make init
-    - run: make build
-    - run: make check-format
-    - run: make test
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+      - run: make init
+      - run: make build
+      - run: make check-format
+      - run: make test

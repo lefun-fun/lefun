@@ -17,8 +17,14 @@ import {
 import { createRoot } from "react-dom/client";
 import { createStore as _createStore, useStore as _useStore } from "zustand";
 
-import type { Locale, MatchSettings, UserId, UsersState } from "@lefun/core";
-import { GameDef } from "@lefun/game";
+import type {
+  Locale,
+  MatchSettings,
+  User,
+  UserId,
+  UsersState,
+} from "@lefun/core";
+import { Game } from "@lefun/game";
 import { setMakeMove, Store, storeContext } from "@lefun/ui";
 
 import { loadMatch, Match, saveMatch } from "./match";
@@ -28,14 +34,14 @@ const LATENCY = 100;
 
 enablePatches();
 
-type MatchState<B, PB> = {
-  board: B;
-  playerboard: PB;
+type MatchState = {
+  board: unknown;
+  playerboard: unknown;
   userId: UserId;
   users: UsersState;
 };
 
-const BoardForPlayer = <B, PB>({
+const BoardForPlayer = ({
   board,
   userId,
   messages,
@@ -54,8 +60,7 @@ const BoardForPlayer = <B, PB>({
   const storeRef = useRef<Store | null>(null);
 
   useEffect(() => {
-    const { lefun } = (window as any).top;
-    const { match, players } = lefun;
+    const { match, players } = (window.top as any).lefun as Lefun;
     const { store: mainStore } = match;
     const { board, playerboards } = mainStore.getState();
 
@@ -77,7 +82,7 @@ const BoardForPlayer = <B, PB>({
 
       // Wait before we apply the updates to simulate a network latency.
       setTimeout(() => {
-        store.setState((state: MatchState<B, PB>) => {
+        store.setState((state: MatchState) => {
           const newState = produce(state, (draft) => {
             applyPatches(draft, patches);
           });
@@ -86,10 +91,8 @@ const BoardForPlayer = <B, PB>({
       }, LATENCY);
     });
 
-    setMakeMove((move, store) => {
-      const { canDo, executeNow } = match.gameDef.moves[move.name];
-
-      const { payload } = move;
+    setMakeMove((store) => (moveName, payload) => {
+      const { canDo, executeNow } = match.game.playerMoves[moveName];
 
       {
         const now = new Date().getTime();
@@ -100,7 +103,7 @@ const BoardForPlayer = <B, PB>({
             userId,
             board,
             playerboard,
-            payload: move.payload,
+            payload,
             ts: now,
           });
           if (!canTheyDo) {
@@ -112,13 +115,13 @@ const BoardForPlayer = <B, PB>({
 
       if (executeNow) {
         // Optimistic update directly on the `store` of the player making the move.
-        store.setState((state: MatchState<B, PB>) => {
-          const newState = produce(state, (draft: Draft<MatchState<B, PB>>) => {
+        store.setState((state: MatchState) => {
+          const newState = produce(state, (draft: Draft<MatchState>) => {
             const { board, playerboard } = draft;
             executeNow({
               userId,
-              board: board as B,
-              playerboard: playerboard as PB,
+              board,
+              playerboard,
               payload,
               delayMove: () => {
                 console.warn("delayMove not implemented yet");
@@ -130,7 +133,7 @@ const BoardForPlayer = <B, PB>({
         });
       }
 
-      match.makeMove(userId, move);
+      match.makeMove(userId, moveName, payload);
       saveMatch(match);
     });
 
@@ -190,8 +193,6 @@ function deepCopy<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
-type EmptyObject = Record<string, never>;
-
 function useSetDimensionCssVariablesOnResize(ref: RefObject<HTMLElement>) {
   const [height, setHeight] = useState(0);
   const [width, setWidth] = useState(0);
@@ -215,10 +216,10 @@ function useSetDimensionCssVariablesOnResize(ref: RefObject<HTMLElement>) {
   return { height, width };
 }
 
-function MatchStateView<B, PB, SB>({
+function MatchStateView({
   matchRef,
 }: {
-  matchRef: RefObject<Match<B, PB, SB>>;
+  matchRef: RefObject<Match<any, any>>;
 }) {
   const state = _useStore(matchRef.current?.store as any, (state) =>
     deepCopy(state),
@@ -274,11 +275,11 @@ function capitalize(s: string): string {
   return s && s[0].toUpperCase() + s.slice(1);
 }
 
-function Settings<B, PB, SB>({
+function Settings({
   matchRef,
   resetMatch,
 }: {
-  matchRef: RefObject<Match<B, PB, SB>>;
+  matchRef: RefObject<Match<any, any>>;
   resetMatch: ({
     locale,
     numPlayers,
@@ -416,7 +417,7 @@ function Settings<B, PB, SB>({
           </>
         )}
       </div>
-      {view === "game" && <MatchStateView<B, PB, SB> matchRef={matchRef} />}
+      {view === "game" && <MatchStateView matchRef={matchRef} />}
     </div>
   );
 }
@@ -495,13 +496,18 @@ function Dimensions({
   );
 }
 
-function Main<B, PB = EmptyObject, SB = EmptyObject>({
-  gameDef,
+type Lefun = {
+  players: Record<UserId, User>;
+  match: Match<any, any>;
+};
+
+function Main({
+  game,
   matchSettings,
   matchData,
   gameData,
 }: {
-  gameDef: GameDef<B, PB, SB>;
+  game: Game<any, any>;
   matchSettings: MatchSettings;
   matchData?: any;
   gameData?: any;
@@ -514,7 +520,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
 
   const [loading, setLoading] = useState(true);
 
-  const matchRef = useRef<Match<B, PB, SB> | null>(null);
+  const matchRef = useRef<Match<any, any> | null>(null);
 
   const resetMatch = useCallback(
     ({
@@ -528,10 +534,10 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
     }) => {
       const userIds = getUserIds(numPlayers);
 
-      let match: Match<B, PB, SB> | null = null;
+      let match: Match<any, any> | null = null;
 
       if (tryToLoad) {
-        match = loadMatch<B, PB, SB>(gameDef);
+        match = loadMatch(game);
       }
 
       const players = Object.fromEntries(
@@ -555,8 +561,8 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
           userIds.map((userId, i) => [userId, { color: i.toString() }]),
         );
 
-        match = new Match<B, PB, SB>({
-          gameDef,
+        match = new Match<any, any>({
+          game,
           matchSettings,
           matchPlayersSettings,
           matchData,
@@ -570,7 +576,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
       (window as any).lefun.match = matchRef.current;
       saveMatch(match);
     },
-    [gameDef, matchData, gameData, matchSettings],
+    [game, matchData, gameData, matchSettings],
   );
 
   const firstRender = useRef(true);
@@ -600,7 +606,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
         {view === "rules" ? <RulesIframe /> : <PlayersIframes />}
       </div>
       {matchRef && (
-        <Settings<B, PB, SB>
+        <Settings
           matchRef={matchRef}
           resetMatch={({
             numPlayers,
@@ -617,8 +623,8 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
 
 type AllMessages = Record<string, Record<string, string>>;
 
-async function render<B, PB = EmptyObject, SB = EmptyObject>({
-  gameDef,
+async function render({
+  game,
   board,
   rules,
   matchSettings = {},
@@ -627,7 +633,7 @@ async function render<B, PB = EmptyObject, SB = EmptyObject>({
   idName = "home",
   messages = { en: {} },
 }: {
-  gameDef: GameDef<B, PB, SB>;
+  game: Game<any, any>;
   board: () => Promise<ReactNode>;
   rules?: () => Promise<ReactNode>;
   matchSettings?: MatchSettings;
@@ -684,7 +690,7 @@ async function render<B, PB = EmptyObject, SB = EmptyObject>({
   const locales = (Object.keys(messages) || ["en"]) as Locale[];
   let content = (
     <Main
-      gameDef={gameDef}
+      game={game}
       matchSettings={matchSettings}
       matchData={matchData}
       gameData={gameData}
@@ -692,7 +698,7 @@ async function render<B, PB = EmptyObject, SB = EmptyObject>({
   );
 
   const store = createStore({
-    numPlayers: gameDef.minPlayers,
+    numPlayers: game.minPlayers,
     locales,
   });
 

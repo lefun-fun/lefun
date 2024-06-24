@@ -1,5 +1,5 @@
 import { UserId } from "@lefun/core";
-import { createMove, GameDef, Moves } from "@lefun/game";
+import { BoardMove, Game, GameState, INIT_MOVE, PlayerMove } from "@lefun/game";
 
 type Player = {
   isRolling: boolean;
@@ -11,21 +11,54 @@ export type Board = {
   players: Record<UserId, Player>;
 };
 
-const [ROLL, roll] = createMove("roll");
+export type RollGameState = GameState<Board>;
 
-const moves: Moves<Board> = {
-  [ROLL]: {
-    executeNow({ board, userId }) {
-      board.players[userId].isRolling = true;
-    },
-    execute({ board, userId, random }) {
-      board.players[userId].diceValue = random.d6();
-      board.players[userId].isRolling = false;
-    },
+type BMT = {
+  someBoardMove: never;
+  someBoardMoveWithArgs: { someArg: number };
+};
+
+const moveWithArg: PlayerMove<RollGameState, { someArg: string }, BMT> = {
+  execute() {
+    //
   },
 };
 
-const game: GameDef<Board> = {
+const roll: PlayerMove<RollGameState, never, BMT> = {
+  executeNow({ board, userId }) {
+    board.players[userId].isRolling = true;
+  },
+  execute({ board, userId, random, delayMove }) {
+    board.players[userId].diceValue = random.d6();
+    board.players[userId].isRolling = false;
+    delayMove("someBoardMove", 100);
+    delayMove("someBoardMoveWithArgs", { someArg: 3 }, 100);
+  },
+};
+
+const initMove: BoardMove<RollGameState, never, BMT> = {
+  execute() {
+    //
+  },
+};
+
+const someBoardMove: BoardMove<RollGameState, never, BMT> = {
+  execute() {
+    //
+  },
+};
+
+const someBoardMoveWithArgs: BoardMove<
+  RollGameState,
+  BMT["someBoardMoveWithArgs"],
+  BMT
+> = {
+  execute() {
+    //
+  },
+};
+
+export const game = {
   initialBoards: ({ players }) => ({
     board: {
       count: 0,
@@ -34,9 +67,10 @@ const game: GameDef<Board> = {
       ),
     },
   }),
-  moves,
+  playerMoves: { roll, moveWithArg },
+  boardMoves: { [INIT_MOVE]: initMove, someBoardMove, someBoardMoveWithArgs },
   minPlayers: 1,
   maxPlayers: 10,
-};
+} satisfies Game<RollGameState, BMT>;
 
-export { game, roll };
+export type RollGame = typeof game;
