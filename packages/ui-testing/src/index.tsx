@@ -4,11 +4,12 @@ import { render as rtlRender, RenderResult } from "@testing-library/react";
 import { ReactNode } from "react";
 import { createStore } from "zustand";
 
+import { GameState } from "@lefun/game";
 import { MatchState, setMakeMove, storeContext } from "@lefun/ui";
 
 export const render = (
   Board: any,
-  state: MatchState<unknown, unknown>,
+  state: MatchState<GameState>,
   locale: string = "en",
 ): RenderResult => {
   const userId = state.userId;
@@ -17,7 +18,7 @@ export const render = (
     throw new Error("userId should not be null");
   }
 
-  const store = createStore<MatchState<unknown, unknown>>()(() => ({
+  const store = createStore<MatchState<GameState>>()(() => ({
     ...state,
   }));
 

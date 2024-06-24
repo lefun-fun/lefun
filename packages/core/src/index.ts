@@ -4,13 +4,15 @@ export * from "./types";
 
 import { UserId } from "./types";
 
+// FIXME this comment?
 /*
  * This is the type returned by move functions created by the game developer.
  */
-export type Move<P = unknown> = {
+
+export type AnyMove = {
   name: string;
-  payload: P;
-};
+  payload: unknown;
+}
 
 export type AkaType = "similar" | "aka" | "inspired" | "original";
 

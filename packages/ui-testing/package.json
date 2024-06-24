@@ -28,6 +28,7 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@lefun/game": "workspace:*",
     "@lefun/ui": "workspace:*",
     "@lingui/core": "^4.7.1",
     "@lingui/react": "^4.7.1",
@@ -47,6 +48,7 @@
     "typescript": "^5.5.2"
   },
   "peerDependencies": {
+    "@lefun/game": "workspace:*",
     "@lefun/ui": "workspace:*",
     "@lingui/core": "^4.7.1",
     "@lingui/react": "^4.7.1",

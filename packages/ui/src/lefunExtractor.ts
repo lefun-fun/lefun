@@ -3,7 +3,7 @@ import { extractor as defaultExtractor } from "@lingui/cli/api";
 import { gameMessageKeys } from "@lefun/core";
 import { GameDef } from "@lefun/game";
 
-export const lefunExtractor = (game: GameDef<any, any, any>) => ({
+export const lefunExtractor = (game: GameDef<any, any>) => ({
   first: true,
   match(filename: string) {
     const extensions = [".ts", ".tsx"];

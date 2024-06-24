@@ -1,5 +1,5 @@
 import { UserId } from "@lefun/core";
-import { createMove, GameDef, Moves, PlayerMove } from "@lefun/game";
+import { createMove, GameDef, GameMoves, PlayerMove } from "@lefun/game";
 
 type Player = {
   isRolling: boolean;
@@ -11,21 +11,42 @@ export type Board = {
   players: Record<UserId, Player>;
 };
 
-const [ROLL, roll] = createMove("roll");
+type EmptyObject = Record<string, never>;
 
-const moves: Moves<Board> = {
-  [ROLL]: {
-    executeNow({ board, userId }) {
-      board.players[userId].isRolling = true;
-    },
-    execute({ board, userId, random }) {
-      board.players[userId].diceValue = random.d6();
-      board.players[userId].isRolling = false;
-    },
-  },
+type GS = {
+  B: Board;
+  PB: EmptyObject;
+  SB: EmptyObject;
 };
 
-const game: GameDef<Board> = {
+const roll = {
+  executeNow({ board, userId }) {
+    board.players[userId].isRolling = true;
+  },
+  execute({ board, userId, random, payload, playerboards }) {
+    board.players[userId].diceValue = random.d6();
+    board.players[userId].isRolling = false;
+  },
+} satisfies PlayerMove<GS, EmptyObject>;
+
+type Payload = { someArg: number };
+
+const moveWithArg = {
+  execute({ board, userId, payload }) {
+    //
+  },
+} satisfies PlayerMove<GS, Payload>;
+
+const moves = {
+  roll,
+  moveWithArg,
+} satisfies GameMoves<GS>;
+
+// type RollGameDef = GameDef<G, typeof moves>;
+
+type GM = typeof moves;
+
+const game = {
   initialBoards: ({ players }) => ({
     board: {
       count: 0,
@@ -37,6 +58,6 @@ const game: GameDef<Board> = {
   moves,
   minPlayers: 1,
   maxPlayers: 10,
-};
+} satisfies GameDef<GS, GM>;
 
-export { game, roll };
+export { GS, GM, roll, game };
