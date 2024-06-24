@@ -24,18 +24,21 @@ importers:
       '@lefun/game':
         specifier: workspace:*
         version: link:../../packages/game
-      '@rollup/plugin-typescript':
-        specifier: ^11.1.6
-        version: 11.1.6(rollup@4.18.1)(tslib@2.6.3)(typescript@5.5.3)
       rollup:
         specifier: ^4.18.1
         version: 4.18.1
+      rollup-plugin-typescript2:
+        specifier: ^0.36.0
+        version: 0.36.0(rollup@4.18.1)(typescript@5.5.3)
       tslib:
         specifier: ^2.6.3
         version: 2.6.3
       typescript:
         specifier: ^5.5.3
         version: 5.5.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.0(@types/node@20.14.10)
 
   game-template/ui:
     dependencies:
@@ -82,9 +85,6 @@ importers:
       '@rollup/plugin-node-resolve':
         specifier: ^15.2.3
         version: 15.2.3(rollup@4.18.1)
-      '@rollup/plugin-typescript':
-        specifier: ^11.1.6
-        version: 11.1.6(rollup@4.18.1)(tslib@2.6.3)(typescript@5.5.3)
       '@types/react':
         specifier: ^18.3.3
         version: 18.3.3
@@ -109,6 +109,9 @@ importers:
       rollup-plugin-postcss:
         specifier: ^4.0.2
         version: 4.0.2(postcss@8.4.39)
+      rollup-plugin-typescript2:
+        specifier: ^0.36.0
+        version: 0.36.0(rollup@4.18.1)(typescript@5.5.3)
       typescript:
         specifier: ^5.5.3
         version: 5.5.3
@@ -8824,6 +8827,16 @@ snapshots:
       find-cache-dir: 3.3.2
       fs-extra: 10.1.0
       rollup: 2.79.1
+      semver: 7.6.2
+      tslib: 2.6.3
+      typescript: 5.5.3
+
+  rollup-plugin-typescript2@0.36.0(rollup@4.18.1)(typescript@5.5.3):
+    dependencies:
+      '@rollup/pluginutils': 4.2.1
+      find-cache-dir: 3.3.2
+      fs-extra: 10.1.0
+      rollup: 4.18.1
       semver: 7.6.2
       tslib: 2.6.3
       typescript: 5.5.3

@@ -10,7 +10,6 @@ import {
   metaItsYourTurn,
   metaMatchEnded,
   metaRemoveUserFromMatch,
-  Move,
   UserId,
 } from "@lefun/core";
 
@@ -20,22 +19,26 @@ import {
   AgentGetMoveRet,
   AutoMoveInfo,
   AutoMoveRet,
-  DelayedMove,
-  delayedMove,
+  BoardMove,
+  DelayedBoardMove,
   GameDef,
   GameDef_,
+  GameStateBase,
+  GetPayloadOf,
   INIT_MOVE,
   initMove,
   kickPlayer,
   MATCH_WAS_ABORTED,
   matchWasAborted,
   parseGameDef,
+  PlayerMove,
   RewardPayload,
 } from "./gameDef";
 import { Random } from "./random";
+import { IfNever } from "./typing";
 
-type MatchTesterOptions<B, PB, SB> = {
-  gameDef: GameDef<B, PB, SB>;
+type MatchTesterOptions<GS extends GameStateBase> = {
+  gameDef: GameDef<GS, any>;
   gameData?: any;
   matchData?: any;
   numPlayers: number;
@@ -68,18 +71,34 @@ type User = {
 
 type UsersState = { byId: Record<UserId, User> };
 
+type MakeMoveRest<
+  G extends GameDef<any, any>,
+  K extends keyof G["playerMoves"],
+> = IfNever<
+  GetPayloadOf<G["playerMoves"][K]>,
+  //
+  [] | [EmptyObject, { canFail?: boolean }],
+  //
+  | [GetPayloadOf<G["playerMoves"][K]>]
+  | [GetPayloadOf<G["playerMoves"][K]>, { canFail?: boolean }]
+>;
+
 /*
  * Use this to test your game rules.
  * It emulates what the backend does.
  */
-export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
-  gameDef: GameDef_<B, PB, SB>;
+export class MatchTester<
+  GS extends GameStateBase,
+  G extends GameDef<GS, any>,
+  BMT extends Record<string, any> = any,
+> {
+  gameDef: GameDef_<GS, BMT>;
   gameData: any;
   matchData?: any;
   meta: Meta;
-  board: B;
-  playerboards: Record<UserId, PB>;
-  secretboard: SB;
+  board: GS["B"];
+  playerboards: Record<UserId, GS["PB"]>;
+  secretboard: GS["SB"];
   users: UsersState;
   matchHasEnded: boolean;
   random: Random;
@@ -88,7 +107,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
   // Clock used for delayedMoves - in ms.
   time: number;
   // List of timers to be executed.
-  delayedMoves: DelayedMove[];
+  delayedMoves: DelayedBoardMove[];
   // To help generate the next userIds.
   nextUserId: number;
   // Variables to check for infinite loops.
@@ -101,7 +120,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
   // Are we using the MatchTester for training.
   // TODO We should probably use different classes for training and for testing.
   _training: boolean;
-  _agents: Record<UserId, Agent<B, PB>>;
+  _agents: Record<UserId, Agent<GS["B"], GS["PB"]>>;
   _isPlaying: boolean;
 
   constructor({
@@ -117,7 +136,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
     training = false,
     logBoardToTrainingLog = false,
     locale = "en",
-  }: MatchTesterOptions<B, PB, SB>) {
+  }: MatchTesterOptions<GS>) {
     if (random == null) {
       random = new Random();
     }
@@ -208,7 +227,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
     const {
       board,
       playerboards = {},
-      secretboard = {} as SB,
+      secretboard = {} as GS["SB"],
       itsYourTurnUsers = [],
     } = gameDef.initialBoards({
       players: meta.players.allIds,
@@ -349,12 +368,12 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
     this._isPlaying = false;
   }
 
-  async makeMoveAndContinue(
+  async makeMoveAndContinue<K extends keyof G["playerMoves"] & string>(
     userId: UserId,
-    move: Move,
-    { canFail = false }: { canFail?: boolean } = {},
+    moveName: K,
+    ...rest: MakeMoveRest<G, K>
   ) {
-    this.makeMove(userId, move, { canFail });
+    this.makeMove(userId, moveName, ...rest);
     await this.makeNextBotMove();
   }
 
@@ -377,8 +396,15 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
       metaItsYourTurn(this.meta, payload);
     };
 
-    const delayMove = (move: Move, delay: number) => {
-      const dm = delayedMove(move, this.time + delay);
+    const delayMove = <K extends keyof BMT & string>(
+      name: K,
+      ...payloadAndDelay: IfNever<BMT[K], [number], [BMT[K], number]>
+    ) => {
+      const [payload, delay] =
+        payloadAndDelay.length === 1 ? [{}, 0] : payloadAndDelay;
+
+      // const { name, payload } = move;
+      const dm = { name, payload, ts: this.time + delay };
       // In the match tester, we only note the delayed move. We'll execute them only if
       // we `fastForward`.
       this.delayedMoves.push(dm);
@@ -392,7 +418,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
     return { delayMove, itsYourTurn, endMatch, reward, logStat };
   }
 
-  makeBoardMove(move: Move) {
+  makeBoardMove(move: BoardMove) {
     const { name, payload } = move;
     const {
       gameDef,
@@ -430,7 +456,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
         playerboards,
         // We trust that the game developer won't use the secretboard if it's not
         // defined!
-        secretboard: secretboard!,
+        secretboard,
         payload,
         gameData,
         matchData,
@@ -444,12 +470,20 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
     }
   }
 
-  makeMove(
+  makeMove<K extends keyof G["playerMoves"] & string>(
     userId: UserId,
-    move: Move,
-    { canFail = false }: { canFail?: boolean } = {},
+    name: K,
+    ...rest: MakeMoveRest<G, K>
   ) {
-    const { name, payload } = move;
+    let payload: GetPayloadOf<G["playerMoves"][K]> = {} as any;
+    let canFail: boolean = false;
+
+    if (rest.length === 1) {
+      payload = rest[0];
+    } else if (rest.length === 2) {
+      payload = rest[0] as any;
+      canFail = rest[1].canFail || false;
+    }
 
     const {
       board,
@@ -463,7 +497,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
       time,
     } = this;
 
-    if (!gameDef.moves[name]) {
+    if (!gameDef.playerMoves[name]) {
       throw new Error(`game does not implement ${name}`);
     }
 
@@ -472,9 +506,9 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
       throw new Error(`unknown userId ${userId}`);
     }
 
-    const { moves } = gameDef;
+    const { playerMoves } = gameDef;
 
-    const moveDef = moves[name];
+    const moveDef = playerMoves[name];
 
     if (!moveDef) {
       throw new Error(`unknown move ${name}`);
@@ -482,7 +516,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
 
     const playerboard = playerboards[userId];
 
-    const { canDo, executeNow, execute } = gameDef.moves[name];
+    const { canDo, executeNow, execute } = gameDef.playerMoves[name];
 
     if (
       canDo !== undefined &&
@@ -504,7 +538,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
         retValue = executeNow({
           userId,
           board,
-          playerboard: playerboard!,
+          playerboard,
           payload,
           delayMove,
         });
@@ -514,7 +548,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
           userId,
           board,
           playerboards,
-          secretboard: secretboard!,
+          secretboard,
           gameData,
           matchData,
           payload,
@@ -585,7 +619,6 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
           }
         }
 
-        // let autoMoveRet: ReturnType<Agent<B, PB>['getMove']>;
         let autoMoveRet: AutoMoveRet | AgentGetMoveRet;
         const t0 = new Date().getTime();
         if (gameDef.autoMove !== undefined) {
@@ -612,7 +645,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
 
         const thinkingTime = t1 - t0;
 
-        let move: Move | undefined;
+        let move: PlayerMove | undefined;
         let autoMoveInfo: AutoMoveInfo | undefined = undefined;
 
         if ("autoMoveInfo" in autoMoveRet) {
@@ -653,9 +686,14 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
         }
 
         if (move) {
+          const { name, payload } = move;
           // We only play one bot move per call. The function will be called again if it's
           // another bot's turn after.
-          return await this.makeMoveAndContinue(userId, move);
+          return await this.makeMoveAndContinue(
+            userId,
+            name,
+            ...([payload] as any),
+          );
         }
       }
     }
@@ -686,12 +724,12 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
     const delayedMoves = this.delayedMoves.filter((du) => du.ts <= this.time);
     // Sort by time, but keep the order in case of equality.
     delayedMoves
-      .map((u, i) => [u, i] as [DelayedMove, number])
+      .map((u, i) => [u, i] as [DelayedBoardMove, number])
       .sort(([u1, i1], [u2, i2]) => Math.sign(u1.ts - u2.ts) || i1 - i2);
 
     for (const delayedMove of delayedMoves) {
-      const { move } = delayedMove;
-      this.makeBoardMove(move);
+      const { name, payload } = delayedMove;
+      this.makeBoardMove({ name, payload });
     }
   }
 

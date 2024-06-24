@@ -1,28 +1,28 @@
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { render as rtlRender, RenderResult } from "@testing-library/react";
-import { ReactNode } from "react";
+import { ElementType, ReactNode } from "react";
 import { createStore } from "zustand";
 
 import { MatchState, setMakeMove, storeContext } from "@lefun/ui";
 
-export const render = (
-  Board: any,
-  state: MatchState<unknown, unknown>,
+export function render(
+  Board: ElementType,
+  state: MatchState,
   locale: string = "en",
-): RenderResult => {
+): RenderResult {
   const userId = state.userId;
   // Sanity check
   if (userId == null) {
     throw new Error("userId should not be null");
   }
 
-  const store = createStore<MatchState<unknown, unknown>>()(() => ({
+  const store = createStore<MatchState>()(() => ({
     ...state,
   }));
 
   // Simply create a store that always use our `state.
-  setMakeMove(() => {});
+  setMakeMove(() => () => {});
 
   i18n.loadAndActivate({
     locale,
@@ -38,4 +38,4 @@ export const render = (
     );
   };
   return rtlRender(<Board userId={userId} />, { wrapper });
-};
+}

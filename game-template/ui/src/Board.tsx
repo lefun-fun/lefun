@@ -1,26 +1,25 @@
 import "./index.css";
 
-import { Trans } from "@lingui/macro";
 import classNames from "classnames";
 
 import type { UserId } from "@lefun/core";
 import {
+  useUsername,
   makeUseSelector,
   makeUseSelectorShallow,
-  useDispatch,
-  useIsPlayer,
-  useUsername,
+  makeUseMakeMove,
 } from "@lefun/ui";
 
-import { Board as _Board, roll } from "roll-game";
+import { GS, Game } from "roll-game";
 
-type B = _Board;
+import { Trans } from "@lingui/macro";
 
 // Dice symbol characters
 const DICE = ["", "\u2680", "\u2681", "\u2682", "\u2683", "\u2684", "\u2685"];
 
-const useSelector = makeUseSelector<B>();
-const useSelectorShallow = makeUseSelectorShallow<B>();
+const useSelector = makeUseSelector<GS>();
+const useSelectorShallow = makeUseSelectorShallow<GS>();
+const useMakeMove = makeUseMakeMove<Game>();
 
 function Player({ userId }: { userId: UserId }) {
   const itsMe = useSelector((state) => state.userId === userId);
@@ -50,12 +49,10 @@ function Die({ userId }: { userId: UserId }) {
 }
 
 function Board() {
-  const dispatch = useDispatch();
+  const makeMove = useMakeMove();
   const players = useSelectorShallow((state) =>
     Object.keys(state.board.players),
   );
-
-  const isPlayer = useIsPlayer();
 
   return (
     <div>
@@ -65,11 +62,16 @@ function Board() {
           <Player key={userId} userId={userId} />
         ))}
       </div>
-      {isPlayer && (
-        <button onClick={() => dispatch(roll())}>
-          <Trans>Roll</Trans>
-        </button>
-      )}
+      <button onClick={() => makeMove("roll")}>
+        <Trans>Roll</Trans>
+      </button>
+      <button
+        onClick={() => {
+          makeMove("moveWithArg", { someArg: "123" });
+        }}
+      >
+        Go
+      </button>
     </div>
   );
 }

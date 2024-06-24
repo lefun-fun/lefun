@@ -1,5 +1,5 @@
 import { UserId } from "@lefun/core";
-import { createMove, GameDef, Moves } from "@lefun/game";
+import { BoardMoveDef, GameDef, GameState, PlayerMoveDef } from "@lefun/game";
 
 type Player = {
   isRolling: boolean;
@@ -11,21 +11,50 @@ export type Board = {
   players: Record<UserId, Player>;
 };
 
-const [ROLL, roll] = createMove("roll");
+type GS = GameState<Board>;
 
-const moves: Moves<Board> = {
-  [ROLL]: {
-    executeNow({ board, userId }) {
-      board.players[userId].isRolling = true;
-    },
-    execute({ board, userId, random }) {
-      board.players[userId].diceValue = random.d6();
-      board.players[userId].isRolling = false;
-    },
-  },
+type BMT = {
+  someBoardMove: never;
+  someBoardMoveWithArgs: { someArg: number };
 };
 
-const game: GameDef<Board> = {
+const moveWithArg = {
+  execute() {
+    //
+  },
+} satisfies PlayerMoveDef<GS, { someArg: string }, BMT>;
+
+const roll = {
+  executeNow({ board, userId }) {
+    board.players[userId].isRolling = true;
+  },
+  execute({ board, userId, random, delayMove }) {
+    board.players[userId].diceValue = random.d6();
+    board.players[userId].isRolling = false;
+    delayMove("someBoardMove", 100);
+    delayMove("someBoardMoveWithArgs", { someArg: 3 }, 100);
+  },
+} satisfies PlayerMoveDef<GS, never, BMT>;
+
+const initMove_ = {
+  execute() {
+    //
+  },
+} satisfies BoardMoveDef<GS, never, BMT>;
+
+const someBoardMove = {
+  execute() {
+    //
+  },
+} satisfies BoardMoveDef<GS, never, BMT>;
+
+const someBoardMoveWithArgs = {
+  execute() {
+    //
+  },
+} satisfies BoardMoveDef<GS, BMT["someBoardMoveWithArgs"], BMT>;
+
+const game = {
   initialBoards: ({ players }) => ({
     board: {
       count: 0,
@@ -34,9 +63,12 @@ const game: GameDef<Board> = {
       ),
     },
   }),
-  moves,
+  playerMoves: { roll, moveWithArg },
+  boardMoves: { initMove_, someBoardMove, someBoardMoveWithArgs },
   minPlayers: 1,
   maxPlayers: 10,
-};
+} satisfies GameDef<GS, BMT>;
 
-export { game, roll };
+type Game = typeof game;
+
+export { Game, game, GS };
