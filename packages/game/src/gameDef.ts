@@ -190,7 +190,6 @@ export type AutoMoveInfo = {
   time?: number;
 };
 
-// FIXME any
 export type AutoMoveRet<
   GS extends GameStateBase,
   PM extends PlayerMoveDefs<GS, any>,
@@ -286,16 +285,6 @@ type PlayerMove<
 };
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
-
-export type PlayerMoveWithOptionalPayload<
-  GS extends GameStateBase,
-  PM extends PlayerMoveDefs<GS, any>,
-  K extends PlayerMoveName<GS, PM>,
-> = [PlayerMovePayload<GS, PM, K>[keyof PlayerMovePayload<GS, PM, K>]] extends [
-  never,
-]
-  ? Optional<PlayerMove<GS, PM, K>, "payload">
-  : PlayerMove<GS, PM, K>;
 
 export type BoardMoveName<BMT> = Extract<keyof BMT, string>;
 

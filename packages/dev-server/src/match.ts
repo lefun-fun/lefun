@@ -13,7 +13,7 @@ import {
   GameStateBase,
   PlayerMoveDefs,
   PlayerMoveName,
-  PlayerMoveWithOptionalPayload,
+  PlayerMovePayload,
   Random,
 } from "@lefun/game";
 
@@ -147,7 +147,8 @@ class Match<
 
   makeMove<K extends PlayerMoveName<GS, PM>>(
     userId: UserId,
-    move: PlayerMoveWithOptionalPayload<GS, PM, K>,
+    name: K,
+    payload: PlayerMovePayload<GS, PM, K>,
   ) {
     const now = new Date().getTime();
 
@@ -161,7 +162,6 @@ class Match<
       throw new Error("no store");
     }
 
-    const { name, payload } = move;
     const { executeNow, execute } = this.gameDef.playerMoves[name];
 
     const patchesByUserId: Record<UserId, Patch[]> = Object.fromEntries(

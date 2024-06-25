@@ -23,7 +23,7 @@ export function render<GS extends GameStateBase>(
   }));
 
   // Simply create a store that always use our `state.
-  setMakeMove(() => {});
+  setMakeMove(() => () => {});
 
   i18n.loadAndActivate({
     locale,

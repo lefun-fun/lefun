@@ -38,7 +38,8 @@ import {
   parseGameDef,
   PlayerMoveDefs,
   PlayerMoveName,
-  PlayerMoveWithOptionalPayload,
+  PlayerMovePayload,
+  // PlayerMoveWithOptionalPayload,
   // PlayerMove,
   RewardPayload,
 } from "./gameDef";
@@ -388,10 +389,11 @@ export class MatchTester<
 
   async makeMoveAndContinue<K extends PlayerMoveName<GS, PM>>(
     userId: UserId,
-    move: PlayerMoveWithOptionalPayload<GS, PM, K>,
+    name: K,
+    payload: PlayerMovePayload<GS, PM, K>,
     { canFail = false }: { canFail?: boolean } = {},
   ) {
-    this.makeMove(userId, move, { canFail });
+    this.makeMove(userId, name, payload, { canFail });
     await this.makeNextBotMove();
   }
 
@@ -490,11 +492,10 @@ export class MatchTester<
 
   makeMove<K extends PlayerMoveName<GS, PM>>(
     userId: UserId,
-    move: PlayerMoveWithOptionalPayload<GS, PM, K>,
+    name: K,
+    payload: PlayerMovePayload<GS, PM, K>,
     { canFail = false }: { canFail?: boolean } = {},
   ) {
-    const { name, payload = {} } = move;
-
     const {
       board,
       playerboards,
@@ -701,7 +702,8 @@ export class MatchTester<
         if (move) {
           // We only play one bot move per call. The function will be called again if it's
           // another bot's turn after.
-          return await this.makeMoveAndContinue(userId, move);
+          const { name, payload } = move;
+          return await this.makeMoveAndContinue(userId, name, payload);
         }
       }
     }

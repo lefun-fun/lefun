@@ -7,7 +7,7 @@ import type {
   GameStateBase,
   PlayerMoveDefs,
   PlayerMoveName,
-  PlayerMoveWithOptionalPayload,
+  PlayerMovePayload,
 } from "@lefun/game";
 
 // In the selectors, assume that the boards are defined. We will add a check in the
@@ -29,35 +29,48 @@ export type Store<GS extends GameStateBase> = StoreApi<MatchState<GS>>;
 
 export const storeContext = createContext<Store<GameStateBase> | null>(null);
 
-let _makeMove: <
-  GS extends GameStateBase,
-  PM extends PlayerMoveDefs<GS, GMT>,
-  GMT,
-  K extends PlayerMoveName<GS, PM>,
->(
-  store: Store<GameStateBase>,
-) => (move: PlayerMoveWithOptionalPayload<GS, PM, K>) => void;
+type IsEmptyObject<T, TRUE, FALSE> = [T[keyof T]] extends [never]
+  ? TRUE
+  : FALSE;
 
-export function setMakeMove(
-  makeMove: <
-    GS extends GameStateBase,
-    PM extends PlayerMoveDefs<GS, any>,
-    K extends PlayerMoveName<GS, PM>,
-  >(
-    move: PlayerMoveWithOptionalPayload<GS, PM, K>,
-    store: Store<GameStateBase>,
-  ) => void,
-) {
-  _makeMove = (store) => (move) => {
-    return makeMove(move, store);
-  };
+type RestPayloadArg<
+  GS extends GameStateBase,
+  PM extends PlayerMoveDefs<GS, any>,
+  K extends PlayerMoveName<GS, PM>,
+> = IsEmptyObject<
+  PlayerMovePayload<GS, PM, K>,
+  [],
+  [PlayerMovePayload<GS, PM, K>]
+>;
+
+type MakeMoveFunc<
+  GS extends GameStateBase,
+  PM extends PlayerMoveDefs<GS, any>,
+> = <K extends PlayerMoveName<GS, PM>>(
+  name: K,
+  ...payload: RestPayloadArg<GS, PM, K>
+) => void;
+
+type StoreMakeMoveFunc<
+  GS extends GameStateBase,
+  PM extends PlayerMoveDefs<GS, any>,
+> = (store: Store<GameStateBase>) => MakeMoveFunc<GS, PM>;
+
+let _makeMove: StoreMakeMoveFunc<any, any> | null = null;
+
+export function setMakeMove<
+  GS extends GameStateBase,
+  PM extends PlayerMoveDefs<GS, any>,
+>(makeMove: (store: Store<GameStateBase>) => MakeMoveFunc<GS, PM>) {
+  _makeMove = makeMove;
 }
 
 export function useMakeMove<
   GS extends GameStateBase,
   PM extends PlayerMoveDefs<GS, any>,
 >(): <K extends PlayerMoveName<GS, PM>>(
-  move: PlayerMoveWithOptionalPayload<GS, PM, K>,
+  name: K,
+  ...payload: RestPayloadArg<GS, PM, K>
 ) => void {
   if (!_makeMove) {
     throw new Error(
@@ -70,7 +83,7 @@ export function useMakeMove<
       "Store is not defined, did you forget <storeContext.Provider>?",
     );
   }
-  return _makeMove(store);
+  return _makeMove(store) as any;
 }
 
 /*

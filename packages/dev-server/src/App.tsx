@@ -85,10 +85,8 @@ const BoardForPlayer = <GS extends GameStateBase>({
       }, LATENCY);
     });
 
-    setMakeMove((move, store) => {
-      const { canDo, executeNow } = match.gameDef.moves[move.name];
-
-      const { payload } = move;
+    setMakeMove((store) => (name, payload) => {
+      const { canDo, executeNow } = match.gameDef.moves[name];
 
       {
         const now = new Date().getTime();
@@ -99,7 +97,7 @@ const BoardForPlayer = <GS extends GameStateBase>({
             userId,
             board,
             playerboard,
-            payload: move.payload,
+            payload,
             ts: now,
           });
           if (!canTheyDo) {
@@ -131,7 +129,7 @@ const BoardForPlayer = <GS extends GameStateBase>({
         });
       }
 
-      match.makeMove(userId, move);
+      match.makeMove(userId, name, payload);
       saveMatch(match);
     });
 

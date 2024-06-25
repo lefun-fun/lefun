@@ -62,13 +62,14 @@ function Board() {
           <Player key={userId} userId={userId} />
         ))}
       </div>
-      <button onClick={() => makeMove({ name: "roll" })}>
+      <button onClick={() => makeMove("roll")}>
         <Trans>Roll</Trans>
       </button>
       <button
-        onClick={() =>
-          makeMove({ name: "moveWithArg", payload: { someArg: "123" } })
-        }
+        onClick={() => {
+          makeMove("moveWithArg", { someArg: "123" });
+          makeMove("moveWithArg", { someArg: "123" });
+        }}
       >
         Go
       </button>
