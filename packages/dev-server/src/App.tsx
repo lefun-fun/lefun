@@ -18,7 +18,7 @@ import { createRoot } from "react-dom/client";
 import { createStore as _createStore, useStore as _useStore } from "zustand";
 
 import type { Locale, MatchSettings, UserId, UsersState } from "@lefun/core";
-import { GameDef, GameMoves, GameState } from "@lefun/game";
+import { GameDef, GameStateBase } from "@lefun/game";
 import { setMakeMove, Store, storeContext } from "@lefun/ui";
 
 import { loadMatch, Match, saveMatch } from "./match";
@@ -35,7 +35,7 @@ type MatchState<B, PB> = {
   users: UsersState;
 };
 
-const BoardForPlayer = <GS extends GameState>({
+const BoardForPlayer = <GS extends GameStateBase>({
   board,
   userId,
   messages,
@@ -196,10 +196,11 @@ function useSetDimensionCssVariablesOnResize(ref: RefObject<HTMLElement>) {
   return { height, width };
 }
 
-function MatchStateView<GS extends GameState>({
+function MatchStateView({
   matchRef,
 }: {
-  matchRef: RefObject<Match<GS>>;
+  // FIXME
+  matchRef: RefObject<Match<any, any, any>>;
 }) {
   const state = _useStore(matchRef.current?.store as any, (state) =>
     deepCopy(state),
@@ -251,11 +252,12 @@ function ButtonRow({ children }: { children: ReactNode }) {
   return <div className="flex space-x-1">{children}</div>;
 }
 
-function Settings<GS extends GameState>({
+function Settings({
   matchRef,
   resetMatch,
 }: {
-  matchRef: RefObject<Match<GS>>;
+  // FIXME
+  matchRef: RefObject<Match<any, any, any>>;
   resetMatch: ({
     locale,
     numPlayers,
@@ -372,17 +374,17 @@ function Settings<GS extends GameState>({
           </Button>
         </ButtonRow>
       </div>
-      <MatchStateView<GS> matchRef={matchRef} />
+      <MatchStateView matchRef={matchRef} />
     </div>
   );
 }
 
-function Main<GS extends GameState, GM extends GameMoves<GS>>({
+function Main({
   gameDef,
   matchSettings,
   matchData,
 }: {
-  gameDef: GameDef<GS, GM>;
+  gameDef: GameDef<any, any, any>;
   matchSettings: MatchSettings;
   matchData?: any;
 }) {
@@ -393,7 +395,7 @@ function Main<GS extends GameState, GM extends GameMoves<GS>>({
 
   const [loading, setLoading] = useState(true);
 
-  const matchRef = useRef<Match<GS> | null>(null);
+  const matchRef = useRef<Match<any, any, any> | null>(null);
 
   const resetMatch = useCallback(
     ({
@@ -407,10 +409,11 @@ function Main<GS extends GameState, GM extends GameMoves<GS>>({
     }) => {
       const userIds = getUserIds(numPlayers);
 
-      let match: Match<GS> | null = null;
+      // FIXME
+      let match: Match<any, any, any> | null = null;
 
       if (tryToLoad) {
-        match = loadMatch<GS>(gameDef);
+        match = loadMatch(gameDef);
       }
 
       const players = Object.fromEntries(
@@ -434,7 +437,8 @@ function Main<GS extends GameState, GM extends GameMoves<GS>>({
           userIds.map((userId, i) => [userId, { color: i.toString() }]),
         );
 
-        match = new Match<GS>({
+        // FIXME
+        match = new Match<any, any, any>({
           gameDef,
           matchSettings,
           matchPlayersSettings,
@@ -505,7 +509,7 @@ function Main<GS extends GameState, GM extends GameMoves<GS>>({
         })}
       </div>
       {matchRef && (
-        <Settings<GS>
+        <Settings
           matchRef={matchRef}
           resetMatch={({
             numPlayers,
@@ -522,7 +526,7 @@ function Main<GS extends GameState, GM extends GameMoves<GS>>({
 
 type AllMessages = Record<string, Record<string, string>>;
 
-async function render<GS extends GameState>({
+async function render({
   gameDef,
   board,
   matchSettings = {},
@@ -531,7 +535,7 @@ async function render<GS extends GameState>({
   messages = { en: {} },
 }: {
   // FIXME
-  gameDef: GameDef<GS, any>;
+  gameDef: GameDef<any, any, any>;
   board: () => Promise<ReactNode>;
   matchSettings?: MatchSettings;
   matchData?: any;

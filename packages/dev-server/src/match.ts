@@ -2,24 +2,34 @@ import { Draft, Patch, produceWithPatches } from "immer";
 import { createStore, StoreApi } from "zustand";
 
 import {
-  // Move,
   Locale,
   MatchPlayersSettings,
   MatchSettings,
   User,
   UserId,
 } from "@lefun/core";
-import { GameDef, GameMove, GameState, Random } from "@lefun/game";
+import {
+  GameDef,
+  GameStateBase,
+  PlayerMoveDefs,
+  PlayerMoveName,
+  PlayerMoveWithOptionalPayload,
+  Random,
+} from "@lefun/game";
 
 type EmptyObject = Record<string, never>;
 
-type State<GS extends GameState> = {
+type State<GS extends GameStateBase> = {
   board: GS["B"];
   playerboards: Record<UserId, GS["PB"] | EmptyObject>;
   secretboard: GS["SB"] | EmptyObject;
 };
 
-class Match<GS extends GameState> extends EventTarget {
+class Match<
+  GS extends GameStateBase,
+  PM extends PlayerMoveDefs<GS, BMT>,
+  BMT,
+> extends EventTarget {
   userIds: UserId[];
   random: Random;
   // FIXME
@@ -135,7 +145,10 @@ class Match<GS extends GameState> extends EventTarget {
     }
   }
 
-  makeMove(userId: UserId, move: GameMove<GS, any>) {
+  makeMove<K extends PlayerMoveName<GS, PM>>(
+    userId: UserId,
+    move: PlayerMoveWithOptionalPayload<GS, PM, K>,
+  ) {
     const now = new Date().getTime();
 
     // Here the `store` is the store for the player making the move, since
@@ -149,7 +162,7 @@ class Match<GS extends GameState> extends EventTarget {
     }
 
     const { name, payload } = move;
-    const { executeNow, execute } = this.gameDef.moves[name];
+    const { executeNow, execute } = this.gameDef.playerMoves[name];
 
     const patchesByUserId: Record<UserId, Patch[]> = Object.fromEntries(
       this.userIds.map((userId) => [userId, []]),
@@ -267,17 +280,17 @@ function separatePatchesByUser(
 }
 
 /* Save match to localStorage */
-function saveMatch<GS extends GameState>(match: Match<GS>) {
+function saveMatch(match: Match<any, any, any>) {
   const state = match.store.getState();
   const userIds = match.userIds;
   localStorage.setItem("match", JSON.stringify({ state, userIds }));
 }
 
 /* Load match from localStorage */
-function loadMatch<GS extends GameState>(
+function loadMatch(
   // FIXME
-  gameDef: GameDef<GS, any>,
-): Match<GS> | null {
+  gameDef: GameDef<any, any>,
+): Match<any, any, any> | null {
   const data = localStorage.getItem("match");
   if (!data) {
     return null;

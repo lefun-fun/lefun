@@ -1,8 +1,10 @@
 import { UserId } from "@lefun/core";
 import {
+  makeGameDef,
   GameDef,
-  GameMoves,
-  PlayerMove,
+  GameState,
+  PlayerMoveDef,
+  BoardMoveDefs,
 } from "@lefun/game";
 
 type Player = {
@@ -17,36 +19,56 @@ export type Board = {
 
 type EmptyObject = Record<string, never>;
 
-type GS = {
-  B: Board;
-  PB: EmptyObject;
-  SB: EmptyObject;
+type GS = GameState<Board>;
+
+type BoardMoveTypes = {
+  _initMove: EmptyObject;
+  someBoardMove: EmptyObject;
+  someBoardMoveWithArgs: { someArg: number };
 };
 
-type MoveWithArgPayload = { someArg: number };
-
 const moveWithArg = {
-  execute({ board, userId, payload }) {
-    //
+  execute({ board, userId, payload, delayMove }) {
+    // execute content
   },
-} satisfies PlayerMove<GS, MoveWithArgPayload>;
+} satisfies PlayerMoveDef<GS, BoardMoveTypes, { someArg: string }>;
 
 const roll = {
   executeNow({ board, userId }) {
     board.players[userId].isRolling = true;
   },
-  execute({ board, userId, random, playerboards }) {
+  execute({ board, userId, random, playerboards, delayMove }) {
     board.players[userId].diceValue = random.d6();
     board.players[userId].isRolling = false;
+    delayMove({ name: "someBoardMove" }, 100);
+    delayMove({ name: "someBoardMoveWithArgs", payload: { someArg: 3 } }, 100);
   },
-} satisfies PlayerMove<GS, EmptyObject>;
+} satisfies PlayerMoveDef<GS, BoardMoveTypes>;
 
-const moves = {
+const playerMoves = {
   moveWithArg,
   roll,
-}
+};
 
-type GM = typeof moves;
+type PM = typeof playerMoves;
+
+const boardMoves = {
+  _initMove: {
+    execute({ board }) {
+      //
+    },
+  },
+  someBoardMove: {
+    execute({ board }) {
+      //
+    },
+  },
+  someBoardMoveWithArgs: {
+    execute({ board, payload }) {
+      //
+    },
+  },
+} satisfies BoardMoveDefs<GS, BoardMoveTypes>;
 
 const game = {
   initialBoards: ({ players }) => ({
@@ -57,9 +79,10 @@ const game = {
       ),
     },
   }),
-  moves,
+  playerMoves,
+  boardMoves,
   minPlayers: 1,
   maxPlayers: 10,
-} satisfies GameDef<GS, GM>;
+} satisfies GameDef<GS, PM, typeof boardMoves, BoardMoveTypes>;
 
-export { GS, GM, game };
+export { GS, PM, game };

@@ -10,7 +10,7 @@ import {
   makeUseMakeMove,
 } from "@lefun/ui";
 
-import { GS, GM } from "roll-game";
+import { GS, PM } from "roll-game";
 
 import { Trans } from "@lingui/macro";
 
@@ -19,7 +19,7 @@ const DICE = ["", "\u2680", "\u2681", "\u2682", "\u2683", "\u2684", "\u2685"];
 
 const useSelector = makeUseSelector<GS>();
 const useSelectorShallow = makeUseSelectorShallow<GS>();
-const useMakeMove = makeUseMakeMove<GS, GM>();
+const useMakeMove = makeUseMakeMove<GS, PM>();
 
 function Player({ userId }: { userId: UserId }) {
   const itsMe = useSelector((state) => state.userId === userId);
@@ -67,7 +67,7 @@ function Board() {
       </button>
       <button
         onClick={() =>
-          makeMove({ name: "moveWithArg", payload: { someArg: 3 } })
+          makeMove({ name: "moveWithArg", payload: { someArg: "123" } })
         }
       >
         Go

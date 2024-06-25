@@ -1,24 +1,24 @@
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { render as rtlRender, RenderResult } from "@testing-library/react";
-import { ReactNode } from "react";
+import { ElementType, ReactNode } from "react";
 import { createStore } from "zustand";
 
-import { GameState } from "@lefun/game";
+import { GameStateBase } from "@lefun/game";
 import { MatchState, setMakeMove, storeContext } from "@lefun/ui";
 
-export const render = (
-  Board: any,
-  state: MatchState<GameState>,
+export function render<GS extends GameStateBase>(
+  Board: ElementType,
+  state: MatchState<GS>,
   locale: string = "en",
-): RenderResult => {
+): RenderResult {
   const userId = state.userId;
   // Sanity check
   if (userId == null) {
     throw new Error("userId should not be null");
   }
 
-  const store = createStore<MatchState<GameState>>()(() => ({
+  const store = createStore<MatchState<GS>>()(() => ({
     ...state,
   }));
 
@@ -39,4 +39,4 @@ export const render = (
     );
   };
   return rtlRender(<Board userId={userId} />, { wrapper });
-};
+}

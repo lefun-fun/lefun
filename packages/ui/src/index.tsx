@@ -4,29 +4,15 @@ import { useShallow } from "zustand/react/shallow";
 
 import type { MatchState as _MatchState, UserId } from "@lefun/core";
 import type {
-  // GameDef,
-  // GameMove,
-  GameMoves,
-  GameMoveWithOptionalPayload,
-  GameState,
-  GameStateDefault,
-  MoveName,
-  // MovePayload,
-  // FIXME make sure we rename these
-  // GameStateDefault,
-  // MoveName,
-  // MovePayload,
-  // PlayerMove,
+  GameStateBase,
+  PlayerMoveDefs,
+  PlayerMoveName,
+  PlayerMoveWithOptionalPayload,
 } from "@lefun/game";
-
-type AnyGameType = GameStateDefault<any, any, any>;
-type UnknownGameType = GameStateDefault<unknown, unknown, unknown>;
-
-// type EmptyObject = Record<string, never>;
 
 // In the selectors, assume that the boards are defined. We will add a check in the
 // client code to make sure this is true.
-export type MatchState<GS extends GameState> = _MatchState<
+export type MatchState<GS extends GameStateBase> = _MatchState<
   GS["B"],
   GS["PB"]
 > & {
@@ -35,38 +21,31 @@ export type MatchState<GS extends GameState> = _MatchState<
   playerboard: GS["PB"];
 };
 
-export type Selector<GS extends GameState, T> = (state: MatchState<GS>) => T;
+export type Selector<GS extends GameStateBase, T> = (
+  state: MatchState<GS>,
+) => T;
 
-// TODO Type this properly
-export type Store<GS extends GameState> = StoreApi<MatchState<GS>>;
+export type Store<GS extends GameStateBase> = StoreApi<MatchState<GS>>;
 
-// FIXME
-export const storeContext = createContext<Store<UnknownGameType> | null>(null);
-
-// type MakeMove<K extends string, P> = P extends EmptyObject
-//   ? <K, P>(moveName: K, payload: P) => void
-//   : <K>(moveName: K) => void;
-
-// let _makeMove: (store: Store) => MakeMove;
-// type AnyGameState = GameStateDefault<any, any, any>
+export const storeContext = createContext<Store<GameStateBase> | null>(null);
 
 let _makeMove: <
-  GS extends GameState,
-  GM extends GameMoves<GS>,
-  K extends MoveName<GS, GM>,
+  GS extends GameStateBase,
+  PM extends PlayerMoveDefs<GS, GMT>,
+  GMT,
+  K extends PlayerMoveName<GS, PM>,
 >(
-  store: Store<AnyGameType>,
-) => (move: GameMoveWithOptionalPayload<GS, GM, K>) => void;
+  store: Store<GameStateBase>,
+) => (move: PlayerMoveWithOptionalPayload<GS, PM, K>) => void;
 
-// export function setMakeMove<GS extends GameState, GM extends GameMoves<GS>>(
 export function setMakeMove(
   makeMove: <
-    GS extends GameState,
-    GM extends GameMoves<GS>,
-    K extends MoveName<GS, GM>,
+    GS extends GameStateBase,
+    PM extends PlayerMoveDefs<GS, any>,
+    K extends PlayerMoveName<GS, PM>,
   >(
-    move: GameMoveWithOptionalPayload<GS, GM, K>,
-    store: Store<UnknownGameType>,
+    move: PlayerMoveWithOptionalPayload<GS, PM, K>,
+    store: Store<GameStateBase>,
   ) => void,
 ) {
   _makeMove = (store) => (move) => {
@@ -74,16 +53,11 @@ export function setMakeMove(
   };
 }
 
-// type EmptyObject = Record<string, never>;
-
-// type IsEmpty<T> = [T[keyof T]] extends [never] ? true : false;
-
-// ? Optional<GameMove<GS, GM, K>, "payload">
-
-export function useMakeMove<GS extends GameState, GM extends GameMoves<GS>>(): <
-  K extends MoveName<GS, GM>,
->(
-  move: GameMoveWithOptionalPayload<GS, GM, K>,
+export function useMakeMove<
+  GS extends GameStateBase,
+  PM extends PlayerMoveDefs<GS, any>,
+>(): <K extends PlayerMoveName<GS, PM>>(
+  move: PlayerMoveWithOptionalPayload<GS, PM, K>,
 ) => void {
   if (!_makeMove) {
     throw new Error(
@@ -108,17 +82,16 @@ export function useMakeMove<GS extends GameState, GM extends GameMoves<GS>>(): <
 // }
 
 export function makeUseMakeMove<
-  GS extends GameState,
-  GM extends GameMoves<GS>,
-  // K extends MoveName<GS, GM>,
+  GS extends GameStateBase,
+  PM extends PlayerMoveDefs<GS, any>,
 >() {
-  return useMakeMove<GS, GM>;
+  return useMakeMove<GS, PM>;
 }
 
 /*
  * Main way to get data from the match state.
  */
-export function useSelector<GS extends GameState, T>(
+export function useSelector<GS extends GameStateBase, T>(
   selector: Selector<GS, T>,
 ): T {
   const store = useContext(storeContext);
@@ -130,13 +103,13 @@ export function useSelector<GS extends GameState, T>(
 
 /* Util to "curry" the types of useSelector<...> */
 export const makeUseSelector =
-  <GS extends GameState>() =>
+  <GS extends GameStateBase>() =>
   <T,>(selector: Selector<GS, T>) =>
     useSelector<GS, T>(selector);
 
 /* Util to "curry" the types of useSelectorShallow<...> */
 export const makeUseSelectorShallow =
-  <GS extends GameState>() =>
+  <GS extends GameStateBase>() =>
   <T,>(selector: Selector<GS, T>) =>
     useSelectorShallow<GS, T>(selector);
 
@@ -144,7 +117,7 @@ export const makeUseSelectorShallow =
  * Same as `useSelector` but will use a shallow equal on the output to decide if a render
  * is required or not.
  */
-export function useSelectorShallow<GS extends GameState, T>(
+export function useSelectorShallow<GS extends GameStateBase, T>(
   selector: Selector<GS, T>,
 ): T {
   return useSelector(useShallow(selector));
@@ -153,7 +126,7 @@ export function useSelectorShallow<GS extends GameState, T>(
 /*
  * Util to check if the user is a player (if not they are a spectator).
  */
-export const useIsPlayer = <GS extends GameState>() => {
+export const useIsPlayer = <GS extends GameStateBase>() => {
   // Currently, the user is a player iif its playerboard is defined.
   const hasPlayerboard = useSelector(
     (state: _MatchState<GS["B"], GS["PB"]>) => {
@@ -201,7 +174,7 @@ const toClientTime =
  *  has happened. This can be useful if you want some action from the server to happen
  *  exactly when a countdown gets to 0.
  */
-export const useToClientTime = <GS extends GameState>() => {
+export const useToClientTime = <GS extends GameStateBase>() => {
   const delta = useSelector(
     (state: _MatchState<GS["B"], GS["PB"]>) => state.timeDelta || 0,
   );
@@ -247,7 +220,7 @@ export const playSound = (name: string) => {
 /*
  * Util to get a username given its userId
  */
-export const useUsername = <GS extends GameState>(
+export const useUsername = <GS extends GameStateBase>(
   userId?: UserId,
 ): string | undefined => {
   const username = useSelector((state: _MatchState<GS["B"], GS["PB"]>) => {
@@ -259,21 +232,16 @@ export const useUsername = <GS extends GameState>(
 /*
  * Return a userId: username mapping.
  */
-export const useUsernames = <GS extends GameState>(): Record<
-  UserId,
-  string
-> => {
+export const useUsernames = (): Record<UserId, string> => {
   // Note the shallow-compared selector.
-  const usernames = useSelectorShallow(
-    (state: _MatchState<GS["B"], GS["PB"]>) => {
-      const users = state.users.byId;
-      const usernames: { [userId: string]: string } = {};
-      for (const [userId, { username }] of Object.entries(users)) {
-        usernames[userId] = username;
-      }
-      return usernames;
-    },
-  );
+  const usernames = useSelectorShallow((state: _MatchState) => {
+    const users = state.users.byId;
+    const usernames: { [userId: string]: string } = {};
+    for (const [userId, { username }] of Object.entries(users)) {
+      usernames[userId] = username;
+    }
+    return usernames;
+  });
 
   return usernames;
 };
