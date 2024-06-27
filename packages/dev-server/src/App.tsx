@@ -28,14 +28,14 @@ const LATENCY = 100;
 
 enablePatches();
 
-type MatchState<B, PB> = {
-  board: B;
-  playerboard: PB;
+type MatchState = {
+  board: unknown;
+  playerboard: unknown;
   userId: UserId;
   users: UsersState;
 };
 
-const BoardForPlayer = <B, PB>({
+const BoardForPlayer = ({
   board,
   userId,
   messages,
@@ -76,7 +76,7 @@ const BoardForPlayer = <B, PB>({
 
       // Wait before we apply the updates to simulate a network latency.
       setTimeout(() => {
-        store.setState((state: MatchState<B, PB>) => {
+        store.setState((state: MatchState) => {
           const newState = produce(state, (draft) => {
             applyPatches(draft, patches);
           });
@@ -85,10 +85,9 @@ const BoardForPlayer = <B, PB>({
       }, LATENCY);
     });
 
-    setMakeMove((move, store) => {
-      const { canDo, executeNow } = match.gameDef.moves[move.name];
-
-      const { payload } = move;
+    setMakeMove((store) => (move) => {
+      const { name, payload } = move;
+      const { canDo, executeNow } = match.gameDef.moves[name];
 
       {
         const now = new Date().getTime();
@@ -99,7 +98,7 @@ const BoardForPlayer = <B, PB>({
             userId,
             board,
             playerboard,
-            payload: move.payload,
+            payload,
             ts: now,
           });
           if (!canTheyDo) {
@@ -111,13 +110,13 @@ const BoardForPlayer = <B, PB>({
 
       if (executeNow) {
         // Optimistic update directly on the `store` of the player making the move.
-        store.setState((state: MatchState<B, PB>) => {
-          const newState = produce(state, (draft: Draft<MatchState<B, PB>>) => {
+        store.setState((state: MatchState) => {
+          const newState = produce(state, (draft: Draft<MatchState>) => {
             const { board, playerboard } = draft;
             executeNow({
               userId,
-              board: board as B,
-              playerboard: playerboard as PB,
+              board,
+              playerboard,
               payload,
               delayMove: () => {
                 throw new Error("delayMove not implemented yet");
@@ -128,7 +127,7 @@ const BoardForPlayer = <B, PB>({
         });
       }
 
-      match.makeMove(userId, move);
+      match.makeMove(userId, name, payload);
       saveMatch(match);
     });
 
@@ -168,7 +167,7 @@ function deepCopy<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
-type EmptyObject = Record<string, never>;
+// type EmptyObject = Record<string, never>;
 
 function useSetDimensionCssVariablesOnResize(ref: RefObject<HTMLElement>) {
   const [height, setHeight] = useState(0);
@@ -193,11 +192,7 @@ function useSetDimensionCssVariablesOnResize(ref: RefObject<HTMLElement>) {
   return { height, width };
 }
 
-function MatchStateView<B, PB, SB>({
-  matchRef,
-}: {
-  matchRef: RefObject<Match<B, PB, SB>>;
-}) {
+function MatchStateView({ matchRef }: { matchRef: RefObject<Match<any>> }) {
   const state = _useStore(matchRef.current?.store as any, (state) =>
     deepCopy(state),
   );
@@ -248,11 +243,11 @@ function ButtonRow({ children }: { children: ReactNode }) {
   return <div className="flex space-x-1">{children}</div>;
 }
 
-function Settings<B, PB, SB>({
+function Settings({
   matchRef,
   resetMatch,
 }: {
-  matchRef: RefObject<Match<B, PB, SB>>;
+  matchRef: RefObject<Match<any>>;
   resetMatch: ({
     locale,
     numPlayers,
@@ -369,17 +364,17 @@ function Settings<B, PB, SB>({
           </Button>
         </ButtonRow>
       </div>
-      <MatchStateView<B, PB, SB> matchRef={matchRef} />
+      <MatchStateView matchRef={matchRef} />
     </div>
   );
 }
 
-function Main<B, PB = EmptyObject, SB = EmptyObject>({
+function Main({
   gameDef,
   matchSettings,
   matchData,
 }: {
-  gameDef: GameDef<B, PB, SB>;
+  gameDef: GameDef<any>;
   matchSettings: MatchSettings;
   matchData?: any;
 }) {
@@ -390,7 +385,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
 
   const [loading, setLoading] = useState(true);
 
-  const matchRef = useRef<Match<B, PB, SB> | null>(null);
+  const matchRef = useRef<Match<any> | null>(null);
 
   const resetMatch = useCallback(
     ({
@@ -404,10 +399,10 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
     }) => {
       const userIds = getUserIds(numPlayers);
 
-      let match: Match<B, PB, SB> | null = null;
+      let match: Match<any> | null = null;
 
       if (tryToLoad) {
-        match = loadMatch<B, PB, SB>(gameDef);
+        match = loadMatch(gameDef);
       }
 
       const players = Object.fromEntries(
@@ -431,7 +426,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
           userIds.map((userId, i) => [userId, { color: i.toString() }]),
         );
 
-        match = new Match<B, PB, SB>({
+        match = new Match<any>({
           gameDef,
           matchSettings,
           matchPlayersSettings,
@@ -502,7 +497,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
         })}
       </div>
       {matchRef && (
-        <Settings<B, PB, SB>
+        <Settings
           matchRef={matchRef}
           resetMatch={({
             numPlayers,
@@ -519,7 +514,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
 
 type AllMessages = Record<string, Record<string, string>>;
 
-async function render<B, PB = EmptyObject, SB = EmptyObject>({
+async function render({
   gameDef,
   board,
   matchSettings = {},
@@ -527,7 +522,7 @@ async function render<B, PB = EmptyObject, SB = EmptyObject>({
   idName = "home",
   messages = { en: {} },
 }: {
-  gameDef: GameDef<B, PB, SB>;
+  gameDef: GameDef<any>;
   board: () => Promise<ReactNode>;
   matchSettings?: MatchSettings;
   matchData?: any;

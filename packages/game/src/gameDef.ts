@@ -10,51 +10,77 @@ import {
   MatchPlayerSettings,
   MatchPlayersSettings,
   MatchSettings,
-  Move,
   ScoreType,
   UserId,
 } from "@lefun/core";
 
 import { Random } from "./random";
 
+export type GameStateBase = { B: unknown; PB: unknown; SB: unknown };
+
+export type GameState<B, PB = EmptyObject, SB = EmptyObject> = {
+  B: B;
+  PB: PB;
+  SB: SB;
+};
+
 type EmptyObject = Record<string, never>;
 
-// We provide a default payload for when we don't need one (for example for moves
-// without any options). This has the side effect of allowing for a missing
-// payload when one should be required.
-export const createMove = <P = EmptyObject>(
+export const INIT_MOVE = "lefun/initMove";
+export const initMove = () => ({ name: INIT_MOVE, payload: {} });
+
+export const ADD_PLAYER = "lefun/addPlayer";
+export const addPlayer = ({ userId }: { userId: UserId }) => ({
+  name: ADD_PLAYER,
+  payload: { userId },
+});
+
+export const KICK_PLAYER = "lefun/kickPlayer";
+export const kickPlayer = ({ userId }: { userId: UserId }) => ({
+  name: KICK_PLAYER,
+  payload: { userId },
+});
+
+export const MATCH_WAS_ABORTED = "lefun/matchWasAborted";
+export const matchWasAborted = () => ({ name: MATCH_WAS_ABORTED, payload: {} });
+
+type IsEmptyObject<T, TRUE, FALSE> = [T[keyof T]] extends [never]
+  ? TRUE
+  : FALSE;
+
+type PayloadArgs<P> = IsEmptyObject<P, [], [P]>;
+
+export function definePlayerMove<GS extends GameStateBase, P = EmptyObject>(
   name: string,
-): [string, (payload?: P) => Move<P>] => {
-  const f = (payload: P = {} as any) => {
-    return { name, payload };
-  };
-  return [name, f];
-};
+  def: PlayerMoveDef<GS, P>,
+): [
+  Record<string, PlayerMoveDef<GS, P>>,
+  (...args: PayloadArgs<P>) => PlayerMove<P>,
+] {
+  return [
+    { [name]: def },
+    (...args: PayloadArgs<P>) =>
+      (args.length > 0
+        ? { name, payload: args[0] }
+        : { name, payload: {} }) as PlayerMove<P>,
+  ];
+}
 
-export const DELAYED_MOVE = "lefun/delayedMove";
-
-/*
- * Construct a delayed move "action"
- */
-export const delayedMove = <P>(
-  move: Move<P>,
-  // Timestamp (using something like `new Date().getTime()`)
-  ts: number,
-): DelayedMove<P> => {
-  return {
-    type: DELAYED_MOVE,
-    ts,
-    move,
-  };
-};
-
-export type DelayedMove<P = unknown> = {
-  type: typeof DELAYED_MOVE;
-  // Time at which we want the move to be executed.
-  ts: number;
-  // The update itself.
-  move: Move<P>;
-};
+export function defineBoardMove<GS extends GameStateBase, P = EmptyObject>(
+  name: string,
+  def: BoardMoveDef<GS, P>,
+): [
+  Record<string, BoardMoveDef<GS, P>>,
+  (...args: PayloadArgs<P>) => BoardMove<P>,
+] {
+  return [
+    { [name]: def },
+    (...args: PayloadArgs<P>) =>
+      (args.length > 0
+        ? { name, payload: args[0] }
+        : { name, payload: {} }) as BoardMove<P>,
+  ];
+}
 
 export type RewardPayload = {
   rewards: Record<UserId, number>;
@@ -62,34 +88,34 @@ export type RewardPayload = {
 };
 
 export type SpecialFuncs = {
-  delayMove: (move: Move<unknown>, delay: number) => { ts: number };
+  delayMove: (move: BoardMove<unknown>, delay: number) => { ts: number };
   itsYourTurn: (arg0: ItsYourTurnPayload) => void;
   endMatch: (arg0?: EndMatchOptions) => void;
   reward?: (options: RewardPayload) => void;
   logStat: (key: string, value: number) => void;
 };
 
-type ExecuteNowOptions<B, PB, P = unknown> = {
+type ExecuteNowOptions<GS extends GameStateBase, P> = {
   userId: UserId;
-  board: B;
+  board: GS["B"];
   // Assume that the game developer has defined the playerboard if they're using it.
-  playerboard: PB;
+  playerboard: GS["PB"];
   payload: P;
   delayMove: SpecialFuncs["delayMove"];
 };
 
-export type ExecuteNow<B, PB, P = unknown> = (
-  options: ExecuteNowOptions<B, PB, P>,
+export type ExecuteNow<G extends GameStateBase, P> = (
+  options: ExecuteNowOptions<G, P>,
   // TODO: We should support returning anything and it would be passed to `execute`.
 ) => void | false;
 
-export type ExecuteOptions<B, PB, SB, P = unknown> = {
+export type ExecuteOptions<G extends GameStateBase, P> = {
   userId: UserId;
-  board: B;
+  board: G["B"];
   // Even though `playerboards` and `secretboard` are optional, we'll assume that the
   // game developer has defined them if they use them if their execute* functions!
-  playerboards: Record<UserId, PB>;
-  secretboard: SB;
+  playerboards: Record<UserId, G["PB"]>;
+  secretboard: G["SB"];
   payload: P;
   random: Random;
   ts: number;
@@ -97,40 +123,30 @@ export type ExecuteOptions<B, PB, SB, P = unknown> = {
   matchData?: any;
 } & SpecialFuncs;
 
-export type Execute<B, PB, SB, P = unknown> = (
-  options: ExecuteOptions<B, PB, SB, P>,
+export type Execute<G extends GameStateBase, P> = (
+  options: ExecuteOptions<G, P>,
 ) => void;
 
-export type PlayerMove<B, PB, SB, P> = {
+export type PlayerMoveDef<G extends GameStateBase, P = EmptyObject> = {
   canDo?: (options: {
     userId: UserId;
-    board: B;
-    playerboard: PB;
+    board: G["B"];
+    playerboard: G["PB"];
     payload: P;
     // We'll pass `null` on the client, where we don't have the server time.
     ts: number | null;
   }) => boolean;
-  executeNow?: ExecuteNow<B, PB, P>;
-  execute?: Execute<B, PB, SB, P>;
+  executeNow?: ExecuteNow<G, P>;
+  execute?: Execute<G, P>;
 };
 
-export type BoardExecute<B, PB, SB, P = unknown> = (
-  options: Omit<ExecuteOptions<B, PB, SB, P>, "userId">,
+export type BoardExecute<G extends GameStateBase, P> = (
+  options: Omit<ExecuteOptions<G, P>, "userId">,
 ) => void;
 
-export type BoardMove<B, PB, SB, P> = {
-  execute?: BoardExecute<B, PB, SB, P>;
+export type BoardMoveDef<G extends GameStateBase, P = EmptyObject> = {
+  execute?: BoardExecute<G, P>;
 };
-
-export type Moves<B, PB = EmptyObject, SB = EmptyObject> = Record<
-  string,
-  PlayerMove<B, PB, SB, any>
->;
-
-export type BoardMoves<B, PB = EmptyObject, SB = EmptyObject> = Record<
-  string,
-  BoardMove<B, PB, SB, any>
->;
 
 export type InitialBoardsOptions<B> = {
   players: UserId[];
@@ -147,12 +163,12 @@ export type InitialBoardsOptions<B> = {
   locale: Locale;
 };
 
-export type InitialPlayerboardOptions<B, PB, SB> = {
+export type InitialPlayerboardOptions<G extends GameStateBase> = {
   userId: UserId;
-  board: B;
-  secretboard: SB;
+  board: G["B"];
+  secretboard: G["SB"];
   // Those are the playerboards for the *other* players.
-  playerboards: Record<UserId, PB>;
+  playerboards: Record<UserId, G["PB"]>;
   random: Random;
   gameData: any;
   matchData?: any;
@@ -192,21 +208,21 @@ export type AutoMoveInfo = {
   time?: number;
 };
 
-export type AutoMoveRet<P = unknown> =
+export type AutoMoveRet =
   | {
-      move: Move<P>;
+      move: PlayerMove<any>;
       duration?: number;
     }
-  | Move<P>;
+  | PlayerMove<any>;
 
-type AutoMoveType<B, PB, SB, P = unknown> = (arg0: {
+type AutoMoveType<GS extends GameStateBase> = (arg0: {
   userId: UserId;
-  board: B;
-  playerboard: PB;
-  secretboard: SB;
+  board: GS["B"];
+  playerboard: GS["PB"];
+  secretboard: GS["SB"];
   random: Random;
   returnAutoMoveInfo: boolean;
-}) => AutoMoveRet<P>;
+}) => AutoMoveRet;
 
 type GetAgent<B, PB> = (arg0: {
   matchSettings: MatchSettings;
@@ -216,7 +232,7 @@ type GetAgent<B, PB> = (arg0: {
 
 export type AgentGetMoveRet<P = unknown> = {
   // The `move` that should be performed.
-  move: Move<P>;
+  move: PlayerMove<P>;
   // Some info used for training.
   autoMoveInfo?: AutoMoveInfo;
   // How much "thinking time" should be pretend this move took.
@@ -247,21 +263,25 @@ export type GetMatchScoreTextOptions<B> = {
   board: B;
 };
 
+export type PlayerMove<P = unknown> = { name: string; payload: P };
+export type BoardMove<P = unknown> = { name: string; payload: P };
+export type DelayedBoardMove = BoardMove & { ts: number };
+
 // This is what the game developer must implement.
-export type GameDef<B, PB = EmptyObject, SB = EmptyObject> = {
-  initialBoards: (options: InitialBoardsOptions<B>) => {
-    board: B;
-    playerboards?: Record<UserId, PB>;
-    secretboard?: SB;
+export type GameDef<G extends GameStateBase = GameStateBase> = {
+  initialBoards: (options: InitialBoardsOptions<G["B"]>) => {
+    board: G["B"];
+    playerboards?: Record<UserId, G["PB"]>;
+    secretboard?: G["SB"];
     itsYourTurnUsers?: UserId[];
   };
   // There is a separate function for the `playerboard` for games that support adding a
   // player into an ongoing match.
-  initialPlayerboard?: (options: InitialPlayerboardOptions<B, PB, SB>) => PB;
+  initialPlayerboard?: (options: InitialPlayerboardOptions<G>) => G["PB"];
 
   // For those the key is the `name` of the move/update
-  moves: Moves<B, PB, SB>;
-  boardMoves?: BoardMoves<B, PB, SB>;
+  playerMoves: Record<string, PlayerMoveDef<G, any>>;
+  boardMoves?: Record<string, BoardMoveDef<G, any>>;
   gameSettings?: GameSettings;
   gamePlayerSettings?: GamePlayerSettings;
 
@@ -276,22 +296,22 @@ export type GameDef<B, PB = EmptyObject, SB = EmptyObject> = {
   playerScoreType?: ScoreType;
 
   // Games can customize the match score representation using this hook.
-  getMatchScoreText?: (options: GetMatchScoreTextOptions<B>) => string;
+  getMatchScoreText?: (options: GetMatchScoreTextOptions<G["B"]>) => string;
 
   // Return a move for a given state of the game for a player. This is used for bots and
   // could be used to play for an unactive user.
   // Not that technically we don't need the `secretboard` in here. In practice sometimes
   // we put data in the secretboard to optimize calculations.
-  autoMove?: AutoMoveType<B, PB, SB>;
-  getAgent?: GetAgent<B, PB>;
+  autoMove?: AutoMoveType<G>;
+  getAgent?: GetAgent<G["B"], G["PB"]>;
 
   // Game-level bot move duration.
   botMoveDuration?: number;
 
   // Log the board to the console. This is mostly used for debugging.
   logBoard?: (options: {
-    board: B;
-    playerboards: Record<UserId, PB>;
+    board: G["B"];
+    playerboards: Record<UserId, G["PB"]>;
   }) => string;
 
   // Min/max number of players for the game.
@@ -307,32 +327,38 @@ export type GameDef<B, PB = EmptyObject, SB = EmptyObject> = {
   stats?: GameStats;
 };
 
+// export const makeGameDef = <
+//   GS extends GameStateBase,
+//   PM extends PlayerMoveDefs<GS, BMT>,
+//   BM extends BoardMoveDefs<GS, BMT>,
+//   BMT = BMTFromBoardMoveDefs<BM>,
+// >(
+//   gameDef: GameDef<GS, PM, BM, BMT>,
+// ) => gameDef;
+
 /*
  * Internal representation of the game definition.
  *
  * When developing a game, use `GameDef` instead.
  */
-export type GameDef_<B = unknown, PB = unknown, SB = unknown> = Omit<
-  GameDef<B, PB, SB>,
-  "stats"
-> & {
+export type GameDef_<GS extends GameStateBase> = Omit<GameDef<GS>, "stats"> & {
   stats?: {
     allIds: string[];
-    // Note that we don't have any flags for stats yet, hence the `Record<string, never>`.
-    byId: Record<string, Record<string, never>>;
+    // Note that we don't have any flags for stats yet, hence the `EmptyObject`.
+    byId: Record<string, EmptyObject>;
   };
 };
 
 /*
  * Parse a @lefun/game game definition into our internal game definition.
  */
-export function parseGameDef<B, PB, SB>(
-  gameDef: GameDef<B, PB, SB>,
-): GameDef_<B, PB, SB> {
+export function parseGameDef<GS extends GameStateBase>(
+  gameDef: GameDef<GS>,
+): GameDef_<GS> {
   // Normalize the stats.
   const { stats: stats_ } = gameDef;
 
-  const stats: GameDef_<B, PB, SB>["stats"] = {
+  const stats: GameDef_<GS>["stats"] = {
     allIds: [],
     byId: {},
   };
@@ -345,31 +371,6 @@ export function parseGameDef<B, PB, SB>(
   }
   return { ...gameDef, stats };
 }
-
-//
-// Special Move
-//
-
-// This is a special move that game developers can implement rules for. If they
-// do, players will be able to join in the middle of a match.
-export const [ADD_PLAYER, addPlayer] = createMove<{
-  userId: UserId;
-}>("lefun/addPlayerMove");
-
-// Note that there is also a kickFromMatch "action" in the 'common' package.
-export const [KICK_PLAYER, kickPlayer] = createMove<{
-  userId: UserId;
-}>("lefun/kickPlayer");
-
-// This is a special move that will be triggered at the start of the match.
-// This way games can implement some logic before any player makes a move, for instance
-// triggering a delayed move.
-export const [INIT_MOVE, initMove] = createMove("lefun/initMove");
-
-// Move triggered by the server when we need to abruptly end a match.
-export const [MATCH_WAS_ABORTED, matchWasAborted] = createMove(
-  "lefun/matchWasAborted",
-);
 
 // Game Manifest
 export type GameManifest = {

@@ -10,7 +10,6 @@ import {
   metaItsYourTurn,
   metaMatchEnded,
   metaRemoveUserFromMatch,
-  Move,
   UserId,
 } from "@lefun/core";
 
@@ -20,22 +19,24 @@ import {
   AgentGetMoveRet,
   AutoMoveInfo,
   AutoMoveRet,
-  DelayedMove,
-  delayedMove,
+  BoardMove,
+  DelayedBoardMove,
   GameDef,
   GameDef_,
+  GameStateBase,
   INIT_MOVE,
   initMove,
   kickPlayer,
   MATCH_WAS_ABORTED,
   matchWasAborted,
   parseGameDef,
+  PlayerMove,
   RewardPayload,
 } from "./gameDef";
 import { Random } from "./random";
 
-type MatchTesterOptions<B, PB, SB> = {
-  gameDef: GameDef<B, PB, SB>;
+type MatchTesterOptions<G extends GameStateBase> = {
+  gameDef: GameDef<G>;
   gameData?: any;
   matchData?: any;
   numPlayers: number;
@@ -58,7 +59,7 @@ export type BotTrainingLogItem =
   | ({ type: "MOVE_INFO" } & AutoMoveInfo)
   | { type: "BOARD"; value: string };
 
-type EmptyObject = Record<string, never>;
+// type EmptyObject = Record<string, never>;
 
 type User = {
   username: string;
@@ -72,14 +73,14 @@ type UsersState = { byId: Record<UserId, User> };
  * Use this to test your game rules.
  * It emulates what the backend does.
  */
-export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
-  gameDef: GameDef_<B, PB, SB>;
+export class MatchTester<GS extends GameStateBase> {
+  gameDef: GameDef_<GS>;
   gameData: any;
   matchData?: any;
   meta: Meta;
-  board: B;
-  playerboards: Record<UserId, PB>;
-  secretboard: SB;
+  board: GS["B"];
+  playerboards: Record<UserId, GS["PB"]>;
+  secretboard: GS["SB"];
   users: UsersState;
   matchHasEnded: boolean;
   random: Random;
@@ -88,7 +89,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
   // Clock used for delayedMoves - in ms.
   time: number;
   // List of timers to be executed.
-  delayedMoves: DelayedMove[];
+  delayedMoves: DelayedBoardMove[];
   // To help generate the next userIds.
   nextUserId: number;
   // Variables to check for infinite loops.
@@ -101,7 +102,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
   // Are we using the MatchTester for training.
   // TODO We should probably use different classes for training and for testing.
   _training: boolean;
-  _agents: Record<UserId, Agent<B, PB>>;
+  _agents: Record<UserId, Agent<GS["B"], GS["PB"]>>;
   _isPlaying: boolean;
 
   constructor({
@@ -117,7 +118,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
     training = false,
     logBoardToTrainingLog = false,
     locale = "en",
-  }: MatchTesterOptions<B, PB, SB>) {
+  }: MatchTesterOptions<GS>) {
     if (random == null) {
       random = new Random();
     }
@@ -208,7 +209,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
     const {
       board,
       playerboards = {},
-      secretboard = {} as SB,
+      secretboard = {} as GS["SB"],
       itsYourTurnUsers = [],
     } = gameDef.initialBoards({
       players: meta.players.allIds,
@@ -351,7 +352,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
 
   async makeMoveAndContinue(
     userId: UserId,
-    move: Move,
+    move: PlayerMove,
     { canFail = false }: { canFail?: boolean } = {},
   ) {
     this.makeMove(userId, move, { canFail });
@@ -377,8 +378,9 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
       metaItsYourTurn(this.meta, payload);
     };
 
-    const delayMove = (move: Move, delay: number) => {
-      const dm = delayedMove(move, this.time + delay);
+    const delayMove = (move: BoardMove, delay: number) => {
+      const { name, payload } = move;
+      const dm = { name, payload, ts: this.time + delay };
       // In the match tester, we only note the delayed move. We'll execute them only if
       // we `fastForward`.
       this.delayedMoves.push(dm);
@@ -392,7 +394,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
     return { delayMove, itsYourTurn, endMatch, reward, logStat };
   }
 
-  makeBoardMove(move: Move) {
+  makeBoardMove(move: BoardMove) {
     const { name, payload } = move;
     const {
       gameDef,
@@ -430,7 +432,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
         playerboards,
         // We trust that the game developer won't use the secretboard if it's not
         // defined!
-        secretboard: secretboard!,
+        secretboard,
         payload,
         gameData,
         matchData,
@@ -446,11 +448,10 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
 
   makeMove(
     userId: UserId,
-    move: Move,
+    move: PlayerMove,
     { canFail = false }: { canFail?: boolean } = {},
   ) {
     const { name, payload } = move;
-
     const {
       board,
       playerboards,
@@ -463,7 +464,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
       time,
     } = this;
 
-    if (!gameDef.moves[name]) {
+    if (!gameDef.playerMoves[name]) {
       throw new Error(`game does not implement ${name}`);
     }
 
@@ -472,9 +473,9 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
       throw new Error(`unknown userId ${userId}`);
     }
 
-    const { moves } = gameDef;
+    const { playerMoves } = gameDef;
 
-    const moveDef = moves[name];
+    const moveDef = playerMoves[name];
 
     if (!moveDef) {
       throw new Error(`unknown move ${name}`);
@@ -482,7 +483,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
 
     const playerboard = playerboards[userId];
 
-    const { canDo, executeNow, execute } = gameDef.moves[name];
+    const { canDo, executeNow, execute } = gameDef.playerMoves[name];
 
     if (
       canDo !== undefined &&
@@ -504,7 +505,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
         retValue = executeNow({
           userId,
           board,
-          playerboard: playerboard!,
+          playerboard,
           payload,
           delayMove,
         });
@@ -514,7 +515,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
           userId,
           board,
           playerboards,
-          secretboard: secretboard!,
+          secretboard,
           gameData,
           matchData,
           payload,
@@ -585,7 +586,6 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
           }
         }
 
-        // let autoMoveRet: ReturnType<Agent<B, PB>['getMove']>;
         let autoMoveRet: AutoMoveRet | AgentGetMoveRet;
         const t0 = new Date().getTime();
         if (gameDef.autoMove !== undefined) {
@@ -612,7 +612,7 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
 
         const thinkingTime = t1 - t0;
 
-        let move: Move | undefined;
+        let move: PlayerMove | undefined;
         let autoMoveInfo: AutoMoveInfo | undefined = undefined;
 
         if ("autoMoveInfo" in autoMoveRet) {
@@ -686,12 +686,12 @@ export class MatchTester<B, PB = EmptyObject, SB = EmptyObject> {
     const delayedMoves = this.delayedMoves.filter((du) => du.ts <= this.time);
     // Sort by time, but keep the order in case of equality.
     delayedMoves
-      .map((u, i) => [u, i] as [DelayedMove, number])
+      .map((u, i) => [u, i] as [DelayedBoardMove, number])
       .sort(([u1, i1], [u2, i2]) => Math.sign(u1.ts - u2.ts) || i1 - i2);
 
     for (const delayedMove of delayedMoves) {
-      const { move } = delayedMove;
-      this.makeBoardMove(move);
+      const { name, payload } = delayedMove;
+      this.makeBoardMove({ name, payload });
     }
   }
 
