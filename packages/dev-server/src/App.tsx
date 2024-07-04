@@ -120,7 +120,8 @@ const BoardForPlayer = <B, PB>({
               playerboard: playerboard as PB,
               payload,
               delayMove: () => {
-                throw new Error("delayMove not implemented yet");
+                console.warn("delayMove not implemented yet");
+                return { ts: 0 };
               },
             });
           });
@@ -378,10 +379,12 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
   gameDef,
   matchSettings,
   matchData,
+  gameData,
 }: {
   gameDef: GameDef<B, PB, SB>;
   matchSettings: MatchSettings;
   matchData?: any;
+  gameData?: any;
 }) {
   const locale = useStore((state) => state.locale);
   const layout = useStore((state) => state.layout);
@@ -436,6 +439,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
           matchSettings,
           matchPlayersSettings,
           matchData,
+          gameData,
           players,
           locale,
         });
@@ -445,7 +449,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
       (window as any).lefun.match = matchRef.current;
       saveMatch(match);
     },
-    [gameDef, matchData, matchSettings],
+    [gameDef, matchData, gameData, matchSettings],
   );
 
   const firstRender = useRef(true);
@@ -524,6 +528,7 @@ async function render<B, PB = EmptyObject, SB = EmptyObject>({
   board,
   matchSettings = {},
   matchData,
+  gameData,
   idName = "home",
   messages = { en: {} },
 }: {
@@ -531,6 +536,7 @@ async function render<B, PB = EmptyObject, SB = EmptyObject>({
   board: () => Promise<ReactNode>;
   matchSettings?: MatchSettings;
   matchData?: any;
+  gameData?: any;
   idName?: string;
   messages?: AllMessages;
 }) {
@@ -573,6 +579,7 @@ async function render<B, PB = EmptyObject, SB = EmptyObject>({
       gameDef={gameDef}
       matchSettings={matchSettings}
       matchData={matchData}
+      gameData={gameData}
     />
   );
 
