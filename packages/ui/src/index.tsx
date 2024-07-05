@@ -16,7 +16,6 @@ export type MatchState<B, PB = EmptyObject> = _MatchState<B, PB> & {
 
 export type Selector<T, B, PB = EmptyObject> = (state: MatchState<B, PB>) => T;
 
-// TODO Type this properly
 export type Store<B = unknown, PB = unknown> = StoreApi<MatchState<B, PB>>;
 
 export const storeContext = createContext<Store | null>(null);
@@ -209,3 +208,22 @@ export const useUsernames = <B, PB>(): Record<UserId, string> => {
 export const useMyUserId = () => {
   return useSelector((state) => state.userId);
 };
+
+/* Return the store object.
+ *
+ * This is useful to access the state without subscribing to changes:
+ * ```
+ * const store = useStore()
+ * const x = store.getState().board.x
+ * ```
+ * */
+export function useStore<B, PB>() {
+  const store = useContext(storeContext) as Store<B, PB>;
+  if (store === null) {
+    throw new Error("Store is `null`, did you forget <storeContext.Provider>?");
+  }
+  return store;
+}
+
+/* Convenience function to get a typed `useStore` hook. */
+export const makeUseStore = <B, PB = EmptyObject>() => useStore<B, PB>;
