@@ -26,7 +26,7 @@ check-format:
 
 .PHONY: bump-version
 bump-version:
-	pnpm lerna version --force-publish --no-private
+	pnpm lerna version --force-publish --no-private --no-git-tag-version
 
 .PHONY: publish
 publish: check-format build test
