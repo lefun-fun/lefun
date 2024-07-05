@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 import { StoreApi, useStore as _useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
@@ -35,12 +35,18 @@ export function useMakeMove(): (move: Move) => void {
     );
   }
   const store = useContext(storeContext);
+
   if (store === null) {
     throw new Error(
       "Store is not defined, did you forget <storeContext.Provider>?",
     );
   }
-  return _makeMove(store);
+
+  // `_makeMove` returns a new function every time it's called, but we don't want to
+  // re-render.
+  const makeMove = useMemo(() => _makeMove(store), [store]);
+
+  return makeMove;
 }
 
 /*
