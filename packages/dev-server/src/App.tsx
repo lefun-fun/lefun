@@ -152,6 +152,26 @@ const BoardForPlayer = <B, PB>({
   );
 };
 
+function RulesWrapper({
+  children,
+  messages,
+  locale,
+}: {
+  children: ReactNode;
+  messages: Record<string, string>;
+  locale: Locale;
+}) {
+  useEffect(() => {
+    i18n.loadAndActivate({ locale, messages });
+  }, [locale, messages]);
+
+  return (
+    <I18nProvider i18n={i18n}>
+      <div style={{ height: "100%", width: "100%" }}>{children}</div>
+    </I18nProvider>
+  );
+}
+
 function getUserIds(numPlayers: number) {
   return Array(numPlayers)
     .fill(null)
@@ -249,6 +269,10 @@ function ButtonRow({ children }: { children: ReactNode }) {
   return <div className="flex space-x-1">{children}</div>;
 }
 
+function capitalize(s: string): string {
+  return s && s[0].toUpperCase() + s.slice(1);
+}
+
 function Settings<B, PB, SB>({
   matchRef,
   resetMatch,
@@ -275,6 +299,8 @@ function Settings<B, PB, SB>({
   const setVisibleUserId = useStore((state) => state.setVisibleUserId);
   const showDim = useStore((state) => state.showDimensions);
   const visibleUserId = useStore((state) => state.visibleUserId);
+  const view = useStore((state) => state.view);
+  const setView = useStore((state) => state.setView);
 
   const userIds = getUserIds(numPlayers);
 
@@ -295,6 +321,15 @@ function Settings<B, PB, SB>({
       <div className="flex flex-col gap-1 items-start justify-start">
         <ButtonRow>
           <Button onClick={toggleCollapsed}>▶</Button>
+        </ButtonRow>
+        <ButtonRow>
+          {(["game", "rules"] as const).map((v) => (
+            <Button key={v} active={v === view} onClick={() => setView(v)}>
+              {capitalize(v)}
+            </Button>
+          ))}
+        </ButtonRow>
+        <ButtonRow>
           <Button onClick={() => toggleShowDimensions()} active={showDim}>
             ? x ?
           </Button>
@@ -308,69 +343,144 @@ function Settings<B, PB, SB>({
             </Button>
           ))}
         </ButtonRow>
-        <ButtonRow>
-          {userIds.map((userId) => (
-            <Button
-              key={userId}
-              onClick={() => setVisibleUserId(userId)}
-              active={visibleUserId === userId}
-            >
-              {userId}
-            </Button>
-          ))}
-          <Button
-            onClick={() => {
-              setVisibleUserId("all");
-              setLayout("row");
-            }}
-            active={visibleUserId === "all" && layout === "row"}
-          >
-            ||
-          </Button>
-          <Button
-            onClick={() => {
-              setVisibleUserId("all");
-              setLayout("column");
-            }}
-            active={visibleUserId === "all" && layout === "column"}
-          >
-            =
-          </Button>
-        </ButtonRow>
-        <ButtonRow>
-          <Button
-            onClick={() => {
-              resetMatch({ numPlayers, locale });
-              window.location.reload();
-            }}
-          >
-            Reset Game State
-          </Button>
-        </ButtonRow>
-        <ButtonRow>
-          <Button
-            onClick={() => {
-              const newNumPlayers = numPlayers + 1;
-              setNumPlayers(newNumPlayers);
-              resetMatch({ numPlayers: newNumPlayers, locale });
-              window.location.reload();
-            }}
-          >
-            Add Player
-          </Button>
-          <Button
-            onClick={() => {
-              const newNumPlayers = numPlayers - 1;
-              setNumPlayers(newNumPlayers);
-              resetMatch({ numPlayers: newNumPlayers, locale });
-              window.location.reload();
-            }}
-          >
-            Remove Player
-          </Button>
-        </ButtonRow>
+        {view === "game" && (
+          <>
+            <ButtonRow>
+              {userIds.map((userId) => (
+                <Button
+                  key={userId}
+                  onClick={() => setVisibleUserId(userId)}
+                  active={visibleUserId === userId}
+                >
+                  {userId}
+                </Button>
+              ))}
+              <Button
+                onClick={() => {
+                  setVisibleUserId("all");
+                  setLayout("row");
+                }}
+                active={visibleUserId === "all" && layout === "row"}
+              >
+                ||
+              </Button>
+              <Button
+                onClick={() => {
+                  setVisibleUserId("all");
+                  setLayout("column");
+                }}
+                active={visibleUserId === "all" && layout === "column"}
+              >
+                =
+              </Button>
+            </ButtonRow>
+            <ButtonRow>
+              <Button
+                onClick={() => {
+                  resetMatch({ numPlayers, locale });
+                  window.location.reload();
+                }}
+              >
+                Reset Game State
+              </Button>
+            </ButtonRow>
+            <ButtonRow>
+              <Button
+                onClick={() => {
+                  const newNumPlayers = numPlayers + 1;
+                  setNumPlayers(newNumPlayers);
+                  resetMatch({ numPlayers: newNumPlayers, locale });
+                  window.location.reload();
+                }}
+              >
+                Add Player
+              </Button>
+              <Button
+                onClick={() => {
+                  const newNumPlayers = numPlayers - 1;
+                  setNumPlayers(newNumPlayers);
+                  resetMatch({ numPlayers: newNumPlayers, locale });
+                  window.location.reload();
+                }}
+              >
+                Remove Player
+              </Button>
+            </ButtonRow>
+          </>
+        )}
       </div>
       <MatchStateView<B, PB, SB> matchRef={matchRef} />
+    </div>
+  );
+}
+
+function PlayersIframes() {
+  const numPlayers = useStore((state) => state.numPlayers);
+  const visibleUserId = useStore((state) => state.visibleUserId);
+  const locale = useStore((state) => state.locale);
+
+  const ref = useRef<HTMLDivElement>(null);
+
+  return (
+    <>
+      {getUserIds(numPlayers).map((userId) => {
+        if (visibleUserId === "all" || visibleUserId === userId) {
+          const { href } = window.location;
+          return (
+            <div
+              className="border border-black w-full h-full overflow-hidden relative z-0"
+              key={userId}
+              ref={ref}
+            >
+              <iframe
+                className="z-0 absolute w-full h-full left-0 top-0"
+                src={`${href}?u=${userId}&l=${locale}`}
+              ></iframe>
+              <Dimensions componentRef={ref} />
+            </div>
+          );
+        }
+        return null;
+      })}
+    </>
+  );
+}
+
+function RulesIframe() {
+  const locale = useStore((state) => state.locale);
+  const { href } = window.location;
+
+  const ref = useRef<HTMLDivElement>(null);
+
+  return (
+    <div
+      className="border border-black w-full h-full overflow-hidden relative z-0"
+      ref={ref}
+    >
+      <iframe
+        className="z-0 absolute w-full h-full left-0 top-0"
+        src={`${href}?v=rules&l=${locale}`}
+      ></iframe>
+      <Dimensions componentRef={ref} />
+    </div>
+  );
+}
+
+function Dimensions({
+  componentRef,
+}: {
+  componentRef: RefObject<HTMLDivElement>;
+}) {
+  const showDim = useStore((state) => state.showDimensions);
+
+  const { width, height } = useSetDimensionCssVariablesOnResize(componentRef);
+
+  if (!showDim) {
+    return null;
+  }
+  return (
+    <div className="z-10 absolute top-0 right-0 bg-black bg-opacity-10 px-1">
+      {Math.round(width)} x {Math.round(height)}
     </div>
   );
 }
@@ -386,6 +496,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
   matchData?: any;
   gameData?: any;
 }) {
+  const view = useStore((state) => state.view);
   const locale = useStore((state) => state.locale);
   const layout = useStore((state) => state.layout);
   const visibleUserId = useStore((state) => state.visibleUserId);
@@ -464,11 +575,6 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
     setLoading(false);
   }, [resetMatch, locale, numPlayers]);
 
-  const ref = useRef<HTMLDivElement>(null);
-  const { width, height } = useSetDimensionCssVariablesOnResize(ref);
-
-  const showDim = useStore((state) => state.showDimensions);
-
   if (loading || !visibleUserId) {
     return <div>Loading</div>;
   }
@@ -481,29 +587,7 @@ function Main<B, PB = EmptyObject, SB = EmptyObject>({
           layout === "row" ? "flex-row" : "flex-col",
         )}
       >
-        {getUserIds(numPlayers).map((userId) => {
-          if (visibleUserId === "all" || visibleUserId === userId) {
-            const { href } = window.location;
-            return (
-              <div
-                className="border border-black w-full h-full overflow-hidden relative z-0"
-                key={userId}
-                ref={ref}
-              >
-                {showDim && (
-                  <div className="z-10 absolute top-0 right-0 bg-black bg-opacity-10 px-1">
-                    {Math.round(width)} x {Math.round(height)}
-                  </div>
-                )}
-                <iframe
-                  className="z-0 absolute w-full h-full left-0 top-0"
-                  src={`${href}?u=${userId}&l=${locale}`}
-                ></iframe>
-              </div>
-            );
-          }
-          return null;
-        })}
+        {view === "rules" ? <RulesIframe /> : <PlayersIframes />}
       </div>
       {matchRef && (
         <Settings<B, PB, SB>
@@ -526,6 +610,7 @@ type AllMessages = Record<string, Record<string, string>>;
 async function render<B, PB = EmptyObject, SB = EmptyObject>({
   gameDef,
   board,
+  rules,
   matchSettings = {},
   matchData,
   gameData,
@@ -534,25 +619,38 @@ async function render<B, PB = EmptyObject, SB = EmptyObject>({
 }: {
   gameDef: GameDef<B, PB, SB>;
   board: () => Promise<ReactNode>;
+  rules?: () => Promise<ReactNode>;
   matchSettings?: MatchSettings;
   matchData?: any;
   gameData?: any;
   idName?: string;
   messages?: AllMessages;
 }) {
-  const urlParams = new URLSearchParams(window.location.search);
-  const userId = urlParams.get("u");
-
   function renderComponent(content: ReactNode) {
     const container = document.getElementById(idName);
     const root = createRoot(container!);
     return root.render(content);
   }
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const locale = urlParams.get("l") as Locale;
+  const isRules = urlParams.get("v") === "rules";
+
+  if (isRules) {
+    if (!rules) {
+      return renderComponent(<div>Rules not defined</div>);
+    }
+    return renderComponent(
+      <RulesWrapper messages={messages[locale]} locale={locale}>
+        {await rules()}
+      </RulesWrapper>,
+    );
+  }
+
+  const userId = urlParams.get("u");
+
   // Is it the player's board?
   if (userId !== null) {
-    const locale = urlParams.get("l") as Locale;
-
     const content = (
       <BoardForPlayer
         board={await board()}

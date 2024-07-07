@@ -14,9 +14,12 @@ const KEYS_TO_LOCAL_STORAGE: (keyof State)[] = [
   "showDimensions",
   "layout",
   "collapsed",
+  "view",
 ];
 
 type Layout = "row" | "column";
+
+type View = "game" | "rules";
 
 type State = {
   collapsed: boolean;
@@ -26,12 +29,14 @@ type State = {
   showDimensions: boolean;
   locale: Locale;
   locales: Locale[];
+  view: View;
   toggleShowDimensions: () => void;
   toggleCollapsed: () => void;
   setLayout: (layout: Layout) => void;
   setNumPlayers: (numPlayers: number) => void;
   setLocale: (locale: Locale) => void;
   setVisibleUserId: (userId: UserId | "all") => void;
+  setView: (view: View) => void;
 };
 
 function saveToLocalStorage(state: Partial<State>): void {
@@ -63,6 +68,7 @@ function createStore({
     showDimensions: false,
     locale: locales[0],
     locales,
+    view: "game",
     //
     toggleShowDimensions: () => {
       set((state) => ({ showDimensions: !state.showDimensions }));
@@ -86,6 +92,10 @@ function createStore({
     },
     setVisibleUserId: (userId: UserId | "all") => {
       set({ visibleUserId: userId });
+      saveToLocalStorage(store.getState());
+    },
+    setView: (view: View) => {
+      set({ view });
       saveToLocalStorage(store.getState());
     },
   }));
