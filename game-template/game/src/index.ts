@@ -1,5 +1,5 @@
 import { UserId } from "@lefun/core";
-import { createMove, GameDef, Moves, PlayerMove } from "@lefun/game";
+import { createMove, GameDef, Moves } from "@lefun/game";
 
 type Player = {
   isRolling: boolean;

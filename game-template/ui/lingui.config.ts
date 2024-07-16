@@ -1,6 +1,7 @@
 import type { LinguiConfig } from "@lingui/conf";
 
 import { lefunExtractor } from "@lefun/ui/lefunExtractor";
+
 import { game } from "roll-game";
 
 const config: LinguiConfig = {

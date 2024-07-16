@@ -1,19 +1,18 @@
 import "./index.css";
 
+import { Trans } from "@lingui/macro";
 import classNames from "classnames";
 
 import type { UserId } from "@lefun/core";
 import {
-  useUsername,
   makeUseSelector,
   makeUseSelectorShallow,
   useDispatch,
   useIsPlayer,
+  useUsername,
 } from "@lefun/ui";
 
 import { Board as _Board, roll } from "roll-game";
-
-import { Trans } from "@lingui/macro";
 
 type B = _Board;
 
