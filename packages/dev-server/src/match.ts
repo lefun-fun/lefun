@@ -131,6 +131,7 @@ class Match<B, PB, SB> extends EventTarget {
     const patchesByUserId: Record<UserId, Patch[]> = Object.fromEntries(
       this.userIds.map((userId) => [userId, []]),
     );
+    patchesByUserId["spectator"] = [];
 
     if (executeNow) {
       // Also run `executeNow` on the local state.
@@ -262,6 +263,7 @@ export function separatePatchesByUser({
           patchesOut[userId].push(patch);
         }
       }
+      patchesOut["spectator"].push(patch);
     }
     // Send 'playerboards' patches to concerned players.
     else if (p0 === "playerboards") {

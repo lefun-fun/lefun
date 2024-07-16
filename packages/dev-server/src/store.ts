@@ -24,7 +24,7 @@ type View = "game" | "rules";
 type State = {
   collapsed: boolean;
   layout: Layout;
-  visibleUserId: UserId | "all";
+  visibleUserId: UserId | "all" | "spectator";
   numPlayers: number;
   showDimensions: boolean;
   locale: Locale;
@@ -35,7 +35,7 @@ type State = {
   setLayout: (layout: Layout) => void;
   setNumPlayers: (numPlayers: number) => void;
   setLocale: (locale: Locale) => void;
-  setVisibleUserId: (userId: UserId | "all") => void;
+  setVisibleUserId: (userId: UserId | "all" | "spectator") => void;
   setView: (view: View) => void;
 };
 

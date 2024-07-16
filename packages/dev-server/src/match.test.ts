@@ -51,6 +51,7 @@ test("separatePatchesByUser", () => {
     const patchesByUser = {
       user1: [],
       user2: [],
+      spectator: [],
     };
 
     separatePatchesByUser({
@@ -85,6 +86,14 @@ test("separatePatchesByUser", () => {
         value: { x: 456 },
       },
     ]);
+
+    expectArraysEqual(patchesByUser["spectator"], [
+      {
+        op: "replace",
+        path: ["board"],
+        value: { x: 456 },
+      },
+    ]);
   }
 
   // With ignoreUserId
@@ -92,6 +101,7 @@ test("separatePatchesByUser", () => {
     const patchesByUser = {
       user1: [],
       user2: [],
+      spectator: [],
     };
 
     separatePatchesByUser({
@@ -112,6 +122,14 @@ test("separatePatchesByUser", () => {
       {
         op: "replace",
         path: ["playerboard"],
+        value: { x: 456 },
+      },
+    ]);
+
+    expectArraysEqual(patchesByUser["spectator"], [
+      {
+        op: "replace",
+        path: ["board"],
         value: { x: 456 },
       },
     ]);

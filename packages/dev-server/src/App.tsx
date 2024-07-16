@@ -42,7 +42,7 @@ const BoardForPlayer = <B, PB>({
   locale,
 }: {
   board: any;
-  userId: UserId;
+  userId: UserId | "spectator";
   messages: Record<string, string>;
   locale: Locale;
 }) => {
@@ -62,7 +62,8 @@ const BoardForPlayer = <B, PB>({
     const store = _createStore(() => ({
       userId,
       board: deepCopy(board),
-      playerboard: deepCopy(playerboards[userId]),
+      playerboard:
+        userId === "spectator" ? undefined : deepCopy(playerboards[userId]),
       users: { byId: deepCopy(players) },
     }));
 
@@ -346,6 +347,12 @@ function Settings<B, PB, SB>({
         {view === "game" && (
           <>
             <ButtonRow>
+              <Button
+                onClick={() => setVisibleUserId("spectator")}
+                active={visibleUserId === "spectator"}
+              >
+                Spec
+              </Button>
               {userIds.map((userId) => (
                 <Button
                   key={userId}
@@ -409,7 +416,7 @@ function Settings<B, PB, SB>({
           </>
         )}
       </div>
-      <MatchStateView<B, PB, SB> matchRef={matchRef} />
+      {view === "game" && <MatchStateView<B, PB, SB> matchRef={matchRef} />}
     </div>
   );
 }
@@ -421,9 +428,12 @@ function PlayersIframes() {
 
   const ref = useRef<HTMLDivElement>(null);
 
+  const userIds = getUserIds(numPlayers);
+  userIds.push("spectator");
+
   return (
     <>
-      {getUserIds(numPlayers).map((userId) => {
+      {userIds.map((userId) => {
         if (visibleUserId === "all" || visibleUserId === userId) {
           const { href } = window.location;
           return (

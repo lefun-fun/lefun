@@ -1,4 +1,4 @@
-import './index.css';
+import "./index.css";
 
 import classNames from "classnames";
 
@@ -8,6 +8,7 @@ import {
   makeUseSelector,
   makeUseSelectorShallow,
   useDispatch,
+  useIsPlayer,
 } from "@lefun/ui";
 
 import { Board as _Board, roll } from "roll-game";
@@ -27,7 +28,7 @@ function Player({ userId }: { userId: UserId }) {
   const username = useUsername(userId);
 
   return (
-    <div className='player'>
+    <div className="player">
       <span className={classNames(itsMe && "bold")}>{username}</span>
       <Die userId={userId} />
     </div>
@@ -42,7 +43,11 @@ function Die({ userId }: { userId: UserId }) {
     (state) => state.board.players[userId].isRolling,
   );
 
-  return <span className="dice">{isRolling || !diceValue ? "?" : DICE[diceValue]}</span>;
+  return (
+    <span className="dice">
+      {isRolling || !diceValue ? "?" : DICE[diceValue]}
+    </span>
+  );
 }
 
 function Board() {
@@ -50,6 +55,8 @@ function Board() {
   const players = useSelectorShallow((state) =>
     Object.keys(state.board.players),
   );
+
+  const isPlayer = useIsPlayer();
 
   return (
     <div>
@@ -59,9 +66,11 @@ function Board() {
           <Player key={userId} userId={userId} />
         ))}
       </div>
-      <button onClick={() => dispatch(roll())}>
-        <Trans>Roll</Trans>
-      </button>
+      {isPlayer && (
+        <button onClick={() => dispatch(roll())}>
+          <Trans>Roll</Trans>
+        </button>
+      )}
     </div>
   );
 }
