@@ -25,26 +25,26 @@
   },
   "dependencies": {
     "@testing-library/react": "^16.0.0",
-    "zustand": "^4.5.2"
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@lefun/ui": "workspace:*",
-    "@lingui/core": "^4.7.1",
-    "@lingui/react": "^4.7.1",
-    "@rollup/plugin-commonjs": "^21.0.1",
-    "@rollup/plugin-node-resolve": "^13.0.6",
+    "@lingui/core": "^4.11.2",
+    "@lingui/react": "^4.11.2",
+    "@rollup/plugin-commonjs": "^21.1.0",
+    "@rollup/plugin-node-resolve": "^13.3.0",
     "@types/react": "18.3.3",
-    "@typescript-eslint/eslint-plugin": "^7.11.0",
-    "@typescript-eslint/parser": "^7.11.0",
+    "@typescript-eslint/eslint-plugin": "^7.16.1",
+    "@typescript-eslint/parser": "^7.16.1",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-simple-import-sort": "^12.1.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "rollup": "^2.60.1",
-    "rollup-plugin-typescript2": "^0.31.1",
-    "typescript": "^5.5.2"
+    "rollup": "^2.79.1",
+    "rollup-plugin-typescript2": "^0.31.2",
+    "typescript": "^5.5.3"
   },
   "peerDependencies": {
     "@lefun/ui": "workspace:*",

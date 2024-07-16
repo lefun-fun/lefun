@@ -36,30 +36,30 @@
     "check-format": "pnpm exec eslint . --quiet"
   },
   "dependencies": {
-    "zustand": "^4.5.2"
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@lefun/core": "workspace:*",
     "@lefun/game": "workspace:*",
-    "@lingui/cli": "^4.7.1",
-    "@lingui/macro": "^4.7.1",
-    "@rollup/plugin-commonjs": "^21.0.1",
-    "@rollup/plugin-node-resolve": "^13.0.6",
-    "@types/node": "^20.11.24",
+    "@lingui/cli": "^4.11.2",
+    "@lingui/macro": "^4.11.2",
+    "@rollup/plugin-commonjs": "^21.1.0",
+    "@rollup/plugin-node-resolve": "^13.3.0",
+    "@types/node": "^20.14.10",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
-    "@typescript-eslint/eslint-plugin": "^7.11.0",
-    "@typescript-eslint/parser": "^7.11.0",
+    "@typescript-eslint/eslint-plugin": "^7.16.1",
+    "@typescript-eslint/parser": "^7.16.1",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-simple-import-sort": "^12.1.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "rollup": "^2.60.1",
+    "rollup": "^2.79.1",
     "rollup-plugin-typescript2": "^0.36.0",
-    "tslib": "^2.3.1",
-    "typescript": "^5.5.2"
+    "tslib": "^2.6.3",
+    "typescript": "^5.5.3"
   },
   "peerDependencies": {
     "@lefun/core": "workspace:*",
