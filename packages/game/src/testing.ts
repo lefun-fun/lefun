@@ -14,6 +14,7 @@ import {
 } from "@lefun/core";
 
 import {
+  ADD_PLAYER,
   Agent,
   AgentGetMoveRet,
   AutoMoveInfo,
@@ -23,6 +24,7 @@ import {
   GameStateBase,
   GetPayloadOfPlayerMove,
   INIT_MOVE,
+  KICK_PLAYER,
   MATCH_WAS_ABORTED,
   parseGame,
   RewardPayload,
@@ -269,7 +271,7 @@ export class MatchTester<
     this._sameBotCount = 0;
 
     // Make the special initial move.
-    this._makeBoardMove("initMove");
+    this._makeBoardMove(INIT_MOVE);
 
     this._botTrainingLog = [];
     this._stats = [];
@@ -316,7 +318,7 @@ export class MatchTester<
     }
 
     // Trigger the game's logic.
-    this._makeBoardMove("addPlayer", { userId });
+    this._makeBoardMove(ADD_PLAYER, { userId });
 
     this.users.byId[userId] = {
       username,
@@ -334,7 +336,7 @@ export class MatchTester<
     const { meta, playerboards } = this;
 
     // Trigger the game's logic.
-    this._makeBoardMove("kickPlayer", { userId });
+    this._makeBoardMove(KICK_PLAYER, { userId });
 
     metaRemoveUserFromMatch(meta, userId);
 
@@ -347,7 +349,7 @@ export class MatchTester<
    */
   abortMatch(): void {
     this._endMatch({});
-    this._makeBoardMove("matchWasAborted");
+    this._makeBoardMove(MATCH_WAS_ABORTED);
   }
 
   /*
