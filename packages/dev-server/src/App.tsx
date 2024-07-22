@@ -256,9 +256,12 @@ const Button = ({
       className={classNames(
         "p-1 border border-neutral-500 rounded-sm",
         "min-w-10",
-        active
-          ? "bg-neutral-600 text-white hover:bg-neutral-700"
-          : "bg-neutral-200 text-black hover:bg-neutral-300",
+        active ? "bg-neutral-600 text-white" : "bg-neutral-200 text-black",
+        disabled
+          ? "opacity-50"
+          : active
+            ? "hover:bg-neutral-700"
+            : "hover:bg-neutral-300",
       )}
       disabled={disabled}
     >
@@ -410,6 +413,7 @@ function Settings({
                   resetMatch({ numPlayers: newNumPlayers, locale });
                   window.location.reload();
                 }}
+                disabled={numPlayers === 1}
               >
                 Remove Player
               </Button>
