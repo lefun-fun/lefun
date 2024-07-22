@@ -13,7 +13,8 @@ export type MatchState<GS extends GameStateBase = GameStateBase> = _MatchState<
 > & {
   userId: UserId;
   board: GS["B"];
-  playerboard: GS["PB"];
+  // We need this to be optional because of spectators.
+  playerboard?: GS["PB"];
 };
 
 export type Selector<GS extends GameStateBase, T> = (
