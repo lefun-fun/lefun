@@ -1,5 +1,12 @@
 import { UserId } from "@lefun/core";
-import { BoardMove, Game, GameState, INIT_MOVE, PlayerMove } from "@lefun/game";
+import {
+  AutoMove,
+  BoardMove,
+  Game,
+  GameState,
+  INIT_MOVE,
+  PlayerMove,
+} from "@lefun/game";
 
 type Player = {
   isRolling: boolean;
@@ -9,6 +16,7 @@ type Player = {
 export type Board = {
   count: number;
   players: Record<UserId, Player>;
+  lastSomeBoardMoveValue?: number;
 };
 
 export type RollGameState = GameState<Board>;
@@ -53,8 +61,8 @@ const someBoardMoveWithArgs: BoardMove<
   BMT["someBoardMoveWithArgs"],
   BMT
 > = {
-  execute() {
-    //
+  execute({ board, payload }) {
+    board.lastSomeBoardMoveValue = payload.someArg;
   },
 };
 
@@ -72,5 +80,12 @@ export const game = {
   minPlayers: 1,
   maxPlayers: 10,
 } satisfies Game<RollGameState, BMT>;
+
+export const autoMove: AutoMove<RollGameState, RollGame> = ({ random }) => {
+  if (random.d2() === 1) {
+    return ["moveWithArg", { someArg: "123" }];
+  }
+  return "roll";
+};
 
 export type RollGame = typeof game;

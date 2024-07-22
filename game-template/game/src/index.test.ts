@@ -1,4 +1,4 @@
-import { test } from "vitest";
+import { expect, test } from "vitest";
 
 import { MatchTester as _MatchTester } from "@lefun/game";
 
@@ -13,5 +13,18 @@ test("sanity check", () => {
   const userId = Object.keys(players)[0];
 
   match.makeMove(userId, "roll");
+  match.makeMove(userId, "roll", {}, { canFail: true });
   match.makeMove(userId, "moveWithArg", { someArg: "123" });
+  match.makeMove(userId, "moveWithArg", { someArg: "123" }, { canFail: true });
+
+  // Time has no passed yet
+  expect(match.board.lastSomeBoardMoveValue).toBeUndefined();
+
+  // Not enough time
+  match.fastForward(50);
+  expect(match.board.lastSomeBoardMoveValue).toBeUndefined();
+
+  // Enough time
+  match.fastForward(50);
+  expect(match.board.lastSomeBoardMoveValue).toEqual(3);
 });

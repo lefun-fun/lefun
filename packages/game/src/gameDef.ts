@@ -95,11 +95,6 @@ export type Execute<G extends GameStateBase, P, BMT extends BMTBase> = (
   options: ExecuteOptions<G, P, BMT>,
 ) => void;
 
-// `any` doesn't seem to work but `infer ?` does.
-export type GetPayloadOfPlayerMove<PM> =
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  PM extends PlayerMove<infer G, infer P, infer BMT> ? P : never;
-
 export type PlayerMove<
   G extends GameStateBase,
   P = NoPayload,
@@ -189,40 +184,61 @@ export type AutoMoveInfo = {
   time?: number;
 };
 
-export type AutoMoveRet =
-  | {
-      move: PlayerMoveObj<any>;
-      duration?: number;
-    }
-  | PlayerMoveObj<any>;
+export type GetPayload<
+  G extends Game<any>,
+  K extends keyof G["playerMoves"] & string,
+> =
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  G["playerMoves"][K] extends PlayerMove<infer G, infer P, infer BMT>
+    ? P
+    : never;
 
-type AutoMoveType<GS extends GameStateBase> = (arg0: {
+/*
+ * `name: string` if the move doesn't have any payload, [name: string, payload: ?]
+ * otherwise.
+ */
+type MoveObj<G extends Game<any>> = {
+  [K in keyof G["playerMoves"] & string]: IfNever<
+    GetPayload<G, K>,
+    K,
+    [K, GetPayload<G, K>]
+  >;
+}[keyof G["playerMoves"] & string];
+
+/*
+ * Stateless function that returns a bot move.
+ */
+export type AutoMove<GS extends GameStateBase, G extends Game<GS>> = (arg0: {
   userId: UserId;
   board: GS["B"];
   playerboard: GS["PB"];
   secretboard: GS["SB"];
   random: Random;
-  returnAutoMoveInfo: boolean;
-}) => AutoMoveRet;
+  withInfo: boolean;
+}) => BotMove<G>;
 
-type GetAgent<B, PB> = (arg0: {
+/*
+ * Return a stateful way (a `Agent` class) to get bot moves.
+ */
+export type GetAgent<GS extends GameStateBase, G extends Game<GS>> = (arg0: {
   matchSettings: MatchSettings;
   matchPlayerSettings: MatchPlayerSettings;
   numPlayers: number;
-}) => Promise<Agent<B, PB>>;
+}) => Promise<Agent<GS, G>>;
 
-export type AgentGetMoveRet<P = unknown> = {
-  // The `move` that should be performed.
-  move: PlayerMoveObj<P>;
-  // Some info used for training.
-  autoMoveInfo?: AutoMoveInfo;
-  // How much "thinking time" should be pretend this move took.
-  // After having calculated our move, we'll wait the difference before actually
-  // executing the move so that it takes that much time.
-  duration?: number;
-};
+export type BotMove<G extends Game<any>> =
+  | MoveObj<G>
+  | {
+      move: MoveObj<G>;
+      // Some info used for training.
+      autoMoveInfo?: AutoMoveInfo;
+      // How much "thinking time" should be pretend this move took.
+      // After having calculated our move, we'll wait the difference before actually
+      // executing the move so that it takes that much time.
+      duration?: number;
+    };
 
-export abstract class Agent<B, PB = EmptyObject> {
+export abstract class Agent<GS extends GameStateBase, G extends Game<GS>> {
   abstract getMove({
     board,
     playerboard,
@@ -231,20 +247,18 @@ export abstract class Agent<B, PB = EmptyObject> {
     withInfo,
     verbose,
   }: {
-    board: B;
-    playerboard: PB;
+    board: GS["B"];
+    playerboard: GS["PB"];
     random: Random;
     userId: UserId;
     withInfo: boolean;
     verbose?: boolean;
-  }): Promise<AgentGetMoveRet>;
+  }): Promise<BotMove<G>>;
 }
 
 export type GetMatchScoreTextOptions<B> = {
   board: B;
 };
-
-type PlayerMoveObj<P = unknown> = { name: string; payload: P };
 
 // This is what the game developer must implement.
 export type Game<
@@ -282,13 +296,6 @@ export type Game<
 
   // Games can customize the match score representation using this hook.
   getMatchScoreText?: (options: GetMatchScoreTextOptions<GS["B"]>) => string;
-
-  // Return a move for a given state of the game for a player. This is used for bots and
-  // could be used to play for an unactive user.
-  // Not that technically we don't need the `secretboard` in here. In practice sometimes
-  // we put data in the secretboard to optimize calculations.
-  autoMove?: AutoMoveType<GS>;
-  getAgent?: GetAgent<GS["B"], GS["PB"]>;
 
   // Game-level bot move duration.
   botMoveDuration?: number;
@@ -379,3 +386,37 @@ export type GameManifest = {
   };
   name?: string;
 };
+
+/* Util to parse the diverse format that can take bot moves, as returned by `autoMove`
+ * and `Agent.getMove`.
+ */
+export function parseBotMove<G extends Game<any, any>>(
+  botMove: BotMove<G>,
+): {
+  name: string;
+  payload?: unknown;
+  autoMoveInfo?: AutoMoveInfo;
+  duration?: number;
+} {
+  let name: string;
+  let payload: unknown = undefined;
+  let autoMoveInfo: AutoMoveInfo | undefined = undefined;
+  let duration: number | undefined = undefined;
+
+  if (typeof botMove === "string") {
+    name = botMove;
+  } else if (Array.isArray(botMove)) {
+    [name, payload] = botMove;
+  } else {
+    ({ autoMoveInfo, duration } = botMove);
+
+    const { move } = botMove;
+    if (typeof move === "string") {
+      name = move;
+    } else {
+      [name, payload] = move;
+    }
+  }
+
+  return { name, payload, autoMoveInfo, duration };
+}

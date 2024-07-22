@@ -16,16 +16,18 @@ import {
 import {
   ADD_PLAYER,
   Agent,
-  AgentGetMoveRet,
+  AutoMove,
   AutoMoveInfo,
-  AutoMoveRet,
+  BotMove,
   Game,
   Game_,
   GameStateBase,
-  GetPayloadOfPlayerMove,
+  GetAgent,
+  GetPayload,
   INIT_MOVE,
   KICK_PLAYER,
   MATCH_WAS_ABORTED,
+  parseBotMove,
   parseGame,
   RewardPayload,
 } from "./gameDef";
@@ -38,8 +40,10 @@ type DelayedBoardMove = {
   ts: number;
 };
 
-type MatchTesterOptions<GS extends GameStateBase> = {
+type MatchTesterOptions<GS extends GameStateBase, G extends Game<GS, any>> = {
   game: Game<GS, any>;
+  getAgent?: GetAgent<GS, G>;
+  autoMove?: AutoMove<GS, G>;
   gameData?: any;
   matchData?: any;
   numPlayers: number;
@@ -74,14 +78,13 @@ type UsersState = { byId: Record<UserId, User> };
 
 type MakeMoveRest<
   G extends Game<any, any>,
-  K extends keyof G["playerMoves"],
+  K extends keyof G["playerMoves"] & string,
 > = IfNever<
-  GetPayloadOfPlayerMove<G["playerMoves"][K]>,
+  GetPayload<G, K>,
   //
   [] | [EmptyObject, { canFail?: boolean }],
   //
-  | [GetPayloadOfPlayerMove<G["playerMoves"][K]>]
-  | [GetPayloadOfPlayerMove<G["playerMoves"][K]>, { canFail?: boolean }]
+  [GetPayload<G, K>] | [GetPayload<G, K>, { canFail?: boolean }]
 >;
 
 /*
@@ -94,6 +97,8 @@ export class MatchTester<
   BMT extends Record<string, any> = any,
 > {
   game: Game_<GS, BMT>;
+  autoMove?: AutoMove<GS, G>;
+  getAgent?: GetAgent<GS, G>;
   gameData: any;
   matchData?: any;
   meta: Meta;
@@ -121,11 +126,13 @@ export class MatchTester<
   // Are we using the MatchTester for training.
   // TODO We should probably use different classes for training and for testing.
   _training: boolean;
-  _agents: Record<UserId, Agent<GS["B"], GS["PB"]>>;
+  _agents: Record<UserId, Agent<GS, G>>;
   _isPlaying: boolean;
 
   constructor({
     game,
+    autoMove,
+    getAgent,
     gameData = undefined,
     matchData = undefined,
     numPlayers,
@@ -137,7 +144,7 @@ export class MatchTester<
     training = false,
     logBoardToTrainingLog = false,
     locale = "en",
-  }: MatchTesterOptions<GS>) {
+  }: MatchTesterOptions<GS, G>) {
     if (random == null) {
       random = new Random();
     }
@@ -255,6 +262,8 @@ export class MatchTester<
       };
     });
 
+    this.autoMove = autoMove;
+    this.getAgent = getAgent;
     this.gameData = gameData;
     this.matchData = matchData;
     this.board = board;
@@ -402,7 +411,9 @@ export class MatchTester<
       ...payloadAndDelay: IfNever<BMT[K], [number], [BMT[K], number]>
     ) => {
       const [payload, delay] =
-        payloadAndDelay.length === 1 ? [{}, 0] : payloadAndDelay;
+        payloadAndDelay.length === 1
+          ? [{}, payloadAndDelay[0]]
+          : payloadAndDelay;
 
       // const { name, payload } = move;
       const dm = { name, payload, ts: this.time + delay };
@@ -475,15 +486,12 @@ export class MatchTester<
     moveName: K,
     ...rest: MakeMoveRest<G, K>
   ) {
-    let payload: GetPayloadOfPlayerMove<G["playerMoves"][K]> = {} as any;
-    let canFail: boolean = false;
-
-    if (rest.length === 1) {
-      payload = rest[0];
-    } else if (rest.length === 2) {
-      payload = rest[0] as any;
-      canFail = rest[1].canFail || false;
-    }
+    const [payload, { canFail = false }] =
+      rest.length === 0
+        ? [undefined, {}]
+        : rest.length === 1
+          ? [rest[0], {}]
+          : rest;
 
     const {
       board,
@@ -571,16 +579,16 @@ export class MatchTester<
       throw new Error("already playing");
     }
     this._isPlaying = true;
-    const { game, meta, _agents, matchSettings, matchPlayersSettings } = this;
+    const { getAgent, meta, _agents, matchSettings, matchPlayersSettings } =
+      this;
 
     const numPlayers = meta.players.allIds.length;
 
     // Initialize agents.
-    // TODO remove the `if` when we deprecate `autoMove`.
-    if (game.getAgent) {
+    if (getAgent) {
       for (const userId of meta.players.allIds) {
         if (meta.players.byId[userId].isBot) {
-          _agents[userId] = await game.getAgent({
+          _agents[userId] = await getAgent({
             matchPlayerSettings: matchPlayersSettings[userId],
             matchSettings,
             numPlayers,
@@ -592,7 +600,8 @@ export class MatchTester<
   }
 
   async makeNextBotMove() {
-    const { meta, game, board, playerboards, secretboard, random } = this;
+    const { meta, game, autoMove, board, playerboards, secretboard, random } =
+      this;
     // Check if we should do a bot move.
     for (
       let userIndex = 0;
@@ -615,47 +624,33 @@ export class MatchTester<
           }
         }
 
-        let autoMoveRet: AutoMoveRet | AgentGetMoveRet;
         const t0 = new Date().getTime();
-        if (game.autoMove !== undefined) {
-          // TODO deprecate the `autoMove` function in favor of the AutoMover class?
-          autoMoveRet = await game.autoMove({
-            board,
-            playerboard: playerboards[userId],
-            secretboard: secretboard!,
-            userId,
-            random,
-            returnAutoMoveInfo: this._training,
-          });
+        const agent = this._agents[userId];
+
+        let botMove: BotMove<G> | undefined = undefined;
+
+        const args = {
+          board,
+          playerboard: playerboards[userId],
+          secretboard,
+          userId,
+          random,
+          withInfo: this._training,
+        };
+
+        if (autoMove) {
+          botMove = await autoMove(args);
+        } else if (agent) {
+          botMove = await agent.getMove(args);
         } else {
-          autoMoveRet = await this._agents[userId].getMove({
-            board,
-            playerboard: playerboards[userId],
-            random,
-            userId,
-            withInfo: this._training,
-            verbose: this._logBoardToTrainingLog,
-          });
+          throw new Error("no autoMove or agent defined");
         }
+
+        const { name, payload, autoMoveInfo } = parseBotMove(botMove);
+
         const t1 = new Date().getTime();
 
         const thinkingTime = t1 - t0;
-
-        let move: { name: string; payload: any } | undefined;
-        let autoMoveInfo: AutoMoveInfo | undefined = undefined;
-
-        if ("autoMoveInfo" in autoMoveRet) {
-          if (autoMoveRet.autoMoveInfo !== undefined) {
-            autoMoveInfo = autoMoveRet.autoMoveInfo;
-          }
-          ({ move } = autoMoveRet);
-        } else {
-          if ("move" in autoMoveRet) {
-            ({ move } = autoMoveRet);
-          } else {
-            move = autoMoveRet;
-          }
-        }
 
         if (autoMoveInfo) {
           autoMoveInfo.time = thinkingTime;
@@ -681,16 +676,13 @@ export class MatchTester<
           );
         }
 
-        if (move) {
-          const { name, payload } = move;
-          // We only play one bot move per call. The function will be called again if it's
-          // another bot's turn after.
-          return await this.makeMoveAndContinue(
-            userId,
-            name,
-            ...([payload] as any),
-          );
-        }
+        // We only play one bot move per call. The function will be called again if it's
+        // another bot's turn after.
+        return await this.makeMoveAndContinue(
+          userId,
+          name,
+          ...((payload === undefined ? [] : [payload]) as any),
+        );
       }
     }
     // No bot played this time.

@@ -3,7 +3,7 @@ import { StoreApi, useStore as _useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
 import type { MatchState as _MatchState, UserId } from "@lefun/core";
-import type { Game, GameStateBase, GetPayloadOfPlayerMove } from "@lefun/game";
+import type { Game, GameStateBase, GetPayload } from "@lefun/game";
 
 // In the selectors, assume that the boards are defined. We will add a check in the
 // client code to make sure this is true.
@@ -32,11 +32,7 @@ type MakeMove<G extends Game<any, any>> = <
   K extends keyof G["playerMoves"] & string,
 >(
   moveName: K,
-  ...payload: IfNever<
-    GetPayloadOfPlayerMove<G["playerMoves"][K]>,
-    [],
-    [GetPayloadOfPlayerMove<G["playerMoves"][K]>]
-  >
+  ...payload: IfNever<GetPayload<G, K>, [], [GetPayload<G, K>]>
 ) => void;
 
 type MakeMoveFull<G extends Game<any, any>> = <
@@ -44,9 +40,9 @@ type MakeMoveFull<G extends Game<any, any>> = <
 >(
   moveName: K,
   ...payload: IfNever<
-    GetPayloadOfPlayerMove<G["playerMoves"][K]>,
-    [GetPayloadOfPlayerMove<G["playerMoves"][K]> | undefined],
-    [GetPayloadOfPlayerMove<G["playerMoves"][K]>]
+    GetPayload<G, K>,
+    [GetPayload<G, K> | undefined],
+    [GetPayload<G, K>]
   >
 ) => void;
 
@@ -85,11 +81,7 @@ export function useMakeMove<G extends Game<any, any>>(): MakeMove<G> {
 
     function newMakeMove<K extends keyof G["playerMoves"] & string>(
       moveName: K,
-      ...payload: IfNever<
-        GetPayloadOfPlayerMove<G["playerMoves"][K]>,
-        [],
-        [GetPayloadOfPlayerMove<G["playerMoves"][K]>]
-      >
+      ...payload: IfNever<GetPayload<G, K>, [], [GetPayload<G, K>]>
     ) {
       return makeMovefull(moveName, payload[0] || {});
     }
