@@ -426,12 +426,30 @@ function Settings({
   );
 }
 
+function PlayerIframe({ userId }: { userId: UserId }) {
+  const locale = useStore((state) => state.locale);
+  const ref = useRef<HTMLDivElement>(null);
+  const { href } = window.location;
+  return (
+    <>
+      <div
+        className="border border-black w-full flex-1 h-0 overflow-hidden relative z-0"
+        key={userId}
+        ref={ref}
+      >
+        <iframe
+          className="z-0 absolute w-full h-full left-0 top-0"
+          src={`${href}?u=${userId}&l=${locale}`}
+        ></iframe>
+        <Dimensions componentRef={ref} />
+      </div>
+    </>
+  );
+}
+
 function PlayersIframes() {
   const numPlayers = useStore((state) => state.numPlayers);
   const visibleUserId = useStore((state) => state.visibleUserId);
-  const locale = useStore((state) => state.locale);
-
-  const ref = useRef<HTMLDivElement>(null);
 
   const userIds = getUserIds(numPlayers);
   userIds.push("spectator");
@@ -440,18 +458,14 @@ function PlayersIframes() {
     <>
       {userIds.map((userId) => {
         if (visibleUserId === "all" || visibleUserId === userId) {
-          const { href } = window.location;
           return (
-            <div
-              className="border border-black w-full h-full overflow-hidden relative z-0"
-              key={userId}
-              ref={ref}
-            >
-              <iframe
-                className="z-0 absolute w-full h-full left-0 top-0"
-                src={`${href}?u=${userId}&l=${locale}`}
-              ></iframe>
-              <Dimensions componentRef={ref} />
+            <div className="w-full h-full flex flex-col">
+              {userId === "spectator" && (
+                <div className="bg-neutral-200 text-center text-sm">
+                  Spectator
+                </div>
+              )}
+              <PlayerIframe userId={userId} />
             </div>
           );
         }
