@@ -10,51 +10,46 @@ import {
 } from "@lefun/core";
 import { Game, GameStateBase, Random } from "@lefun/game";
 
-type EmptyObject = Record<string, never>;
-
-type State<GS extends GameStateBase> = {
-  board: GS["B"];
-  playerboards: Record<UserId, GS["PB"] | EmptyObject>;
-  secretboard: GS["SB"] | EmptyObject;
+type State = {
+  board: unknown;
+  playerboards: Record<UserId, unknown>;
+  secretboard: unknown;
 };
 
-class Match<
-  GS extends GameStateBase,
-  G extends Game<GS, any>,
-> extends EventTarget {
-  userIds: UserId[];
+type G = Game<GameStateBase, any>;
+
+class Match extends EventTarget {
   random: Random;
   game: G;
+  players: Record<UserId, User>;
+  matchData: unknown;
+  gameData: unknown;
 
   // Store that represents the backend.
   // We need to put it in a zustand Store because we want the JSON view in the right
   // panel to refresh with changes of state.
-  store: StoreApi<State<GS>>;
-
-  // Note some of the constructors parameters in case we want to reset.
-  matchData: any;
-  gameData: any;
+  store: StoreApi<State>;
 
   constructor({
-    players,
     game,
+    players,
     matchSettings,
     matchPlayersSettings,
     matchData,
     gameData,
     locale,
+    //
     state,
-    userIds,
   }: {
-    players?: Record<UserId, User>;
     game: G;
+    players: Record<UserId, User>;
     matchSettings?: MatchSettings;
     matchPlayersSettings?: MatchPlayersSettings;
-    matchData?: any;
-    gameData?: any;
+    matchData?: unknown;
+    gameData?: unknown;
     locale?: Locale;
-    state?: State<GS>;
-    userIds?: UserId[];
+    //
+    state?: State;
   }) {
     super();
 
@@ -62,16 +57,14 @@ class Match<
     this.random = random;
 
     this.game = game;
-    this.userIds = userIds || [];
+    this.players = players;
     this.matchData = matchData;
     this.gameData = gameData;
 
-    this.store = createStore(() => (state || {}) as State<GS>);
-
-    if (!state) {
-      if (!players) {
-        throw new Error("players required");
-      }
+    if (state) {
+      this.store = createStore(() => state as State);
+    } else {
+      // If no saved `state was provided, we need to create everything from scratch.
       if (!matchSettings) {
         throw new Error("match settings required");
       }
@@ -84,15 +77,20 @@ class Match<
         throw new Error("locale required");
       }
 
-      this.userIds = Object.keys(players);
+      if (!players) {
+        throw new Error("players required");
+      }
+
       const areBots = Object.fromEntries(
         Object.entries(players).map(([userId, { isBot }]) => [userId, !!isBot]),
       );
 
+      const userIds = Object.keys(players);
+
       // We do this once to make sure we have the same data for everyplayer.
       // Then we'll deep copy the boards to make sure they are not linked.
       const initialBoards = game.initialBoards({
-        players: Object.keys(players),
+        players: userIds,
         matchSettings,
         matchPlayersSettings,
         matchData,
@@ -101,12 +99,13 @@ class Match<
         areBots,
         locale,
       });
+
       const { board, secretboard = {} } = initialBoards;
       let { playerboards } = initialBoards;
 
       if (!playerboards) {
         playerboards = {};
-        for (const userId of this.userIds) {
+        for (const userId of userIds) {
           playerboards[userId] = {};
         }
       }
@@ -134,17 +133,19 @@ class Match<
 
     const { executeNow, execute } = this.game.playerMoves[moveName];
 
+    const userIds = Object.keys(this.players);
+
     const patchesByUserId: Record<UserId, Patch[]> = Object.fromEntries(
-      this.userIds.map((userId) => [userId, []]),
+      userIds.map((userId) => [userId, []]),
     );
     patchesByUserId["spectator"] = [];
 
     if (executeNow) {
       // Also run `executeNow` on the local state.
-      this.store.setState((state: State<GS>) => {
+      this.store.setState((state: State) => {
         const [newState, patches] = produceWithPatches(
           state,
-          (draft: Draft<State<GS>>) => {
+          (draft: Draft<State>) => {
             const { board, playerboards } = draft;
             executeNow({
               // We have had issues with the combination of `setState` and
@@ -152,8 +153,8 @@ class Match<
               // workaround.
               payload: JSON.parse(JSON.stringify(payload)),
               userId,
-              board: board as GS["B"],
-              playerboard: playerboards[userId] as GS["PB"],
+              board,
+              playerboard: playerboards[userId],
               delayMove: () => {
                 console.warn("delayMove not implemented yet");
                 return { ts: 0 };
@@ -164,7 +165,7 @@ class Match<
 
         separatePatchesByUser({
           patches,
-          userIds: this.userIds,
+          userIds,
           ignoreUserId: userId,
           patchesOut: patchesByUserId,
         });
@@ -174,23 +175,23 @@ class Match<
 
     if (execute) {
       const { store, random, matchData, gameData } = this;
-      store.setState((state: State<GS>) => {
+      store.setState((state: State) => {
         const [newState, patches] = produceWithPatches(
           state,
           (
             draft: Draft<{
-              board: GS["B"];
-              playerboards: Record<UserId, GS["PB"]>;
-              secretboard: GS["SB"];
+              board: unknown;
+              playerboards: Record<UserId, unknown>;
+              secretboard: unknown;
             }>,
           ) => {
             const { board, playerboards, secretboard } = draft;
             execute({
               payload,
               userId,
-              board: board as GS["B"],
-              playerboards: playerboards as Record<UserId, GS["PB"]>,
-              secretboard: secretboard as GS["SB"],
+              board,
+              playerboards,
+              secretboard,
               matchData,
               gameData,
               random,
@@ -213,7 +214,7 @@ class Match<
         );
         separatePatchesByUser({
           patches,
-          userIds: this.userIds,
+          userIds,
           patchesOut: patchesByUserId,
         });
         return newState;
@@ -234,14 +235,14 @@ class Match<
 
   serialize(): string {
     const state = this.store.getState();
-    const { userIds, matchData, gameData } = this;
-    return JSON.stringify({ state, userIds, matchData, gameData });
+    const { players, matchData, gameData } = this;
+    return JSON.stringify({ state, players, matchData, gameData });
   }
 
-  static deserialize(str: string, game: Game<any, any>): Match<any, any> {
+  static deserialize(str: string, game: Game<any, any>): Match {
     const obj = JSON.parse(str);
-    const { state, userIds, matchData, gameData } = obj;
-    return new Match({ state, userIds, matchData, gameData, game });
+    const { state, players, matchData, gameData } = obj;
+    return new Match({ state, players, matchData, gameData, game });
   }
 }
 
@@ -281,13 +282,11 @@ export function separatePatchesByUser({
   }
 }
 
-/* Save match to localStorage */
-function saveMatch(match: Match<any, any>) {
+function saveMatchToLocalStorage(match: Match) {
   localStorage.setItem("match", match.serialize());
 }
 
-/* Load match from localStorage */
-function loadMatch(game: Game<any, any>): Match<any, any> | null {
+function loadMatchFromLocalStorage(game: Game<any, any>): Match | null {
   const str = localStorage.getItem("match");
 
   if (!str) {
@@ -302,4 +301,4 @@ function loadMatch(game: Game<any, any>): Match<any, any> | null {
   }
 }
 
-export { loadMatch, Match, saveMatch };
+export { loadMatchFromLocalStorage, Match, saveMatchToLocalStorage };

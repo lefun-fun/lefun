@@ -7,8 +7,9 @@ import { createStore as _createStore, useStore as _useStore } from "zustand";
 
 import type { Locale, UserId } from "@lefun/core";
 
+import type { Match } from "./match";
+
 const KEYS_TO_LOCAL_STORAGE: (keyof State)[] = [
-  "numPlayers",
   "visibleUserId",
   "locale",
   "showDimensions",
@@ -25,7 +26,6 @@ type State = {
   collapsed: boolean;
   layout: Layout;
   visibleUserId: UserId | "all" | "spectator";
-  numPlayers: number;
   showDimensions: boolean;
   locale: Locale;
   locales: Locale[];
@@ -33,10 +33,11 @@ type State = {
   toggleShowDimensions: () => void;
   toggleCollapsed: () => void;
   setLayout: (layout: Layout) => void;
-  setNumPlayers: (numPlayers: number) => void;
   setLocale: (locale: Locale) => void;
   setVisibleUserId: (userId: UserId | "all" | "spectator") => void;
   setView: (view: View) => void;
+  resetMatch: (arg0: { locale: Locale; numPlayers?: number }) => void;
+  match: Match | undefined;
 };
 
 function saveToLocalStorage(state: Partial<State>): void {
@@ -53,23 +54,19 @@ function loadFromLocalStorage(store: ReturnType<typeof createStore>) {
   store.setState(obj);
 }
 
-function createStore({
-  numPlayers,
-  locales,
-}: {
-  numPlayers: number;
-  locales: Locale[];
-}) {
+function createStore({ locales }: { locales: Locale[] }) {
   const store = _createStore<State>()((set) => ({
     collapsed: false,
     layout: "row",
-    numPlayers,
     visibleUserId: "all",
     showDimensions: false,
     locale: locales[0],
     locales,
     view: "game",
-    //
+    match: undefined,
+    resetMatch: () => {
+      //
+    },
     toggleShowDimensions: () => {
       set((state) => ({ showDimensions: !state.showDimensions }));
       saveToLocalStorage(store.getState());
@@ -80,10 +77,6 @@ function createStore({
     },
     setLayout: (layout: Layout) => {
       set({ layout });
-      saveToLocalStorage(store.getState());
-    },
-    setNumPlayers: (numPlayers) => {
-      set({ numPlayers });
       saveToLocalStorage(store.getState());
     },
     setLocale: (locale: Locale) => {

@@ -6,28 +6,19 @@ import { I18nProvider } from "@lingui/react";
 import classNames from "classnames";
 import { applyPatches, Draft, enablePatches, Patch, produce } from "immer";
 import { JsonEditor } from "json-edit-react";
-import {
-  ReactNode,
-  RefObject,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { ReactNode, RefObject, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { createStore as _createStore, useStore as _useStore } from "zustand";
+import { createStore as _createStore } from "zustand";
 
-import type {
-  Locale,
-  MatchSettings,
-  User,
-  UserId,
-  UsersState,
-} from "@lefun/core";
+import type { Locale, MatchSettings, UserId, UsersState } from "@lefun/core";
 import { Game } from "@lefun/game";
 import { setMakeMove, Store, storeContext } from "@lefun/ui";
 
-import { loadMatch, Match, saveMatch } from "./match";
+import {
+  loadMatchFromLocalStorage,
+  Match,
+  saveMatchToLocalStorage,
+} from "./match";
 import { createStore, MainStoreContext, useStore } from "./store";
 
 const LATENCY = 100;
@@ -43,11 +34,13 @@ type MatchState = {
 
 const BoardForPlayer = ({
   board,
+  match,
   userId,
   messages,
   locale,
 }: {
   board: any;
+  match: Match;
   userId: UserId | "spectator";
   messages: Record<string, string>;
   locale: Locale;
@@ -60,10 +53,12 @@ const BoardForPlayer = ({
   const storeRef = useRef<Store | null>(null);
 
   useEffect(() => {
-    const { match, players } = (window.top as any).lefun as Lefun;
+    const { players } = match;
     const { store: mainStore } = match;
     const { board, playerboards } = mainStore.getState();
 
+    // We create a local store with the player's boards.
+    // We'll update this local store when we receive updates from the "main" match.
     const store = _createStore(() => ({
       userId,
       board: deepCopy(board),
@@ -134,12 +129,12 @@ const BoardForPlayer = ({
       }
 
       match.makeMove(userId, moveName, payload);
-      saveMatch(match);
+      saveMatchToLocalStorage(match);
     });
 
     storeRef.current = store;
     setLoading(false);
-  }, [userId]);
+  }, [userId, match]);
 
   if (loading) {
     return <div>Loading player...</div>;
@@ -216,13 +211,9 @@ function useSetDimensionCssVariablesOnResize(ref: RefObject<HTMLElement>) {
   return { height, width };
 }
 
-function MatchStateView({
-  matchRef,
-}: {
-  matchRef: RefObject<Match<any, any>>;
-}) {
-  const state = _useStore(matchRef.current?.store as any, (state) =>
-    deepCopy(state),
+function MatchStateView() {
+  const state = useStore((state) =>
+    deepCopy(state.match?.store.getState() || {}),
   );
 
   return (
@@ -278,26 +269,12 @@ function capitalize(s: string): string {
   return s && s[0].toUpperCase() + s.slice(1);
 }
 
-function Settings({
-  matchRef,
-  resetMatch,
-}: {
-  matchRef: RefObject<Match<any, any>>;
-  resetMatch: ({
-    locale,
-    numPlayers,
-  }: {
-    locale: Locale;
-    numPlayers: number;
-  }) => void;
-}) {
+function Settings() {
   const setLayout = useStore((state) => state.setLayout);
   const toggleCollapsed = useStore((state) => state.toggleCollapsed);
   const toggleShowDimensions = useStore((state) => state.toggleShowDimensions);
   const layout = useStore((state) => state.layout);
   const collapsed = useStore((state) => state.collapsed);
-  const numPlayers = useStore((state) => state.numPlayers);
-  const setNumPlayers = useStore((state) => state.setNumPlayers);
   const locales = useStore((state) => state.locales);
   const locale = useStore((state) => state.locale);
   const setLocale = useStore((state) => state.setLocale);
@@ -306,8 +283,17 @@ function Settings({
   const visibleUserId = useStore((state) => state.visibleUserId);
   const view = useStore((state) => state.view);
   const setView = useStore((state) => state.setView);
+  const match = useStore((state) => state.match);
+  const resetMatch = useStore((state) => state.resetMatch);
 
-  const userIds = getUserIds(numPlayers);
+  if (!match) {
+    return null;
+  }
+
+  const { players } = match;
+
+  const userIds = Object.keys(players);
+  const numPlayers = userIds.length;
 
   if (collapsed) {
     return (
@@ -388,8 +374,7 @@ function Settings({
             <ButtonRow>
               <Button
                 onClick={() => {
-                  resetMatch({ numPlayers, locale });
-                  window.location.reload();
+                  resetMatch({ locale });
                 }}
               >
                 Reset Game State
@@ -398,22 +383,17 @@ function Settings({
             <ButtonRow>
               <Button
                 onClick={() => {
-                  const newNumPlayers = numPlayers + 1;
-                  setNumPlayers(newNumPlayers);
-                  resetMatch({ numPlayers: newNumPlayers, locale });
-                  window.location.reload();
+                  resetMatch({ numPlayers: numPlayers + 1, locale });
                 }}
+                disabled={numPlayers >= match.game.maxPlayers}
               >
                 Add Player
               </Button>
               <Button
                 onClick={() => {
-                  const newNumPlayers = numPlayers - 1;
-                  setNumPlayers(newNumPlayers);
-                  resetMatch({ numPlayers: newNumPlayers, locale });
-                  window.location.reload();
+                  resetMatch({ numPlayers: numPlayers - 1, locale });
                 }}
-                disabled={numPlayers === 1}
+                disabled={numPlayers <= match.game.minPlayers}
               >
                 Remove Player
               </Button>
@@ -421,7 +401,7 @@ function Settings({
           </>
         )}
       </div>
-      {view === "game" && <MatchStateView matchRef={matchRef} />}
+      {view === "game" && <MatchStateView />}
     </div>
   );
 }
@@ -430,6 +410,10 @@ function PlayerIframe({ userId }: { userId: UserId }) {
   const locale = useStore((state) => state.locale);
   const ref = useRef<HTMLDivElement>(null);
   const { href } = window.location;
+
+  // Force reloading the iframe when the component is rendered.
+  const key = Math.random();
+
   return (
     <>
       <div
@@ -440,6 +424,7 @@ function PlayerIframe({ userId }: { userId: UserId }) {
         <iframe
           className="z-0 absolute w-full h-full left-0 top-0"
           src={`${href}?u=${userId}&l=${locale}`}
+          key={key}
         ></iframe>
         <Dimensions componentRef={ref} />
       </div>
@@ -448,10 +433,9 @@ function PlayerIframe({ userId }: { userId: UserId }) {
 }
 
 function PlayersIframes() {
-  const numPlayers = useStore((state) => state.numPlayers);
   const visibleUserId = useStore((state) => state.visibleUserId);
-
-  const userIds = getUserIds(numPlayers);
+  const players = useStore((state) => state.match?.players || {});
+  const userIds = Object.keys(players);
   userIds.push("spectator");
 
   return (
@@ -459,7 +443,7 @@ function PlayersIframes() {
       {userIds.map((userId) => {
         if (visibleUserId === "all" || visibleUserId === userId) {
           return (
-            <div className="w-full h-full flex flex-col">
+            <div className="w-full h-full flex flex-col" key={userId}>
               {userId === "spectator" && (
                 <div className="bg-neutral-200 text-center text-sm">
                   Spectator
@@ -515,101 +499,20 @@ function Dimensions({
 }
 
 type Lefun = {
-  players: Record<UserId, User>;
-  match: Match<any, any>;
+  match: Match;
 };
 
-function Main({
-  game,
-  matchSettings,
-  matchData,
-  gameData,
-}: {
-  game: Game<any, any>;
-  matchSettings: MatchSettings;
-  matchData?: any;
-  gameData?: any;
-}) {
+function Main() {
   const view = useStore((state) => state.view);
-  const locale = useStore((state) => state.locale);
   const layout = useStore((state) => state.layout);
   const visibleUserId = useStore((state) => state.visibleUserId);
-  const numPlayers = useStore((state) => state.numPlayers);
+  const match = useStore((state) => state.match);
 
-  const [loading, setLoading] = useState(true);
+  if (!match) {
+    return null;
+  }
 
-  const matchRef = useRef<Match<any, any> | null>(null);
-
-  const resetMatch = useCallback(
-    ({
-      locale,
-      numPlayers,
-      tryToLoad = false,
-    }: {
-      locale: Locale;
-      numPlayers: number;
-      tryToLoad?: boolean;
-    }) => {
-      const userIds = getUserIds(numPlayers);
-
-      let match: Match<any, any> | null = null;
-
-      if (tryToLoad) {
-        match = loadMatch(game);
-      }
-
-      const players = Object.fromEntries(
-        userIds.map((userId) => [
-          userId,
-          {
-            username: `Player ${userId}`,
-            isBot: false,
-            // TODO We don't need to know if they are guests in here.
-            isGuest: false,
-          },
-        ]),
-      );
-
-      (window as any).lefun.players = players;
-
-      if (match === null) {
-        // A different color per player.
-        // TODO This is game specific!
-        const matchPlayersSettings = Object.fromEntries(
-          userIds.map((userId, i) => [userId, { color: i.toString() }]),
-        );
-
-        match = new Match<any, any>({
-          game,
-          matchSettings,
-          matchPlayersSettings,
-          matchData,
-          gameData,
-          players,
-          locale,
-        });
-      }
-
-      matchRef.current = match;
-      (window as any).lefun.match = matchRef.current;
-      saveMatch(match);
-    },
-    [game, matchData, gameData, matchSettings],
-  );
-
-  const firstRender = useRef(true);
-
-  // Call the `resetMatch` callback the first time we render.
-  useEffect(() => {
-    if (!firstRender.current) {
-      return;
-    }
-    resetMatch({ tryToLoad: true, locale, numPlayers });
-    firstRender.current = false;
-    setLoading(false);
-  }, [resetMatch, locale, numPlayers]);
-
-  if (loading || !visibleUserId) {
+  if (!visibleUserId) {
     return <div>Loading</div>;
   }
 
@@ -623,23 +526,78 @@ function Main({
       >
         {view === "rules" ? <RulesIframe /> : <PlayersIframes />}
       </div>
-      {matchRef && (
-        <Settings
-          matchRef={matchRef}
-          resetMatch={({
-            numPlayers,
-            locale,
-          }: {
-            numPlayers: number;
-            locale: Locale;
-          }) => resetMatch({ tryToLoad: false, numPlayers, locale })}
-        />
-      )}
+      <Settings />
     </div>
   );
 }
 
 type AllMessages = Record<string, Record<string, string>>;
+
+const initMatch = ({
+  game,
+  matchData,
+  gameData,
+  matchSettings,
+  locale,
+  numPlayers,
+  tryToLoadFromLocaleStorage = false,
+}: {
+  game: Game<any, any>;
+  matchData: unknown;
+  gameData: unknown;
+  matchSettings: MatchSettings;
+  locale: Locale;
+  numPlayers: number;
+  tryToLoadFromLocaleStorage?: boolean;
+}) => {
+  let match: Match | null = null;
+
+  if (tryToLoadFromLocaleStorage) {
+    match = loadMatchFromLocalStorage(game);
+  }
+
+  // Sanity check to make sure the match is valid.
+  if (match) {
+    const numPlayers = Object.keys(match.players).length;
+    if (numPlayers > game.maxPlayers || numPlayers < game.minPlayers) {
+      match = null;
+    }
+  }
+
+  if (match === null) {
+    const userIds = getUserIds(numPlayers);
+
+    const players = Object.fromEntries(
+      userIds.map((userId) => [
+        userId,
+        {
+          username: `Player ${userId}`,
+          isBot: false,
+          // TODO We don't need to know if they are guests in here.
+          isGuest: false,
+        },
+      ]),
+    );
+
+    // A different color per player.
+    // TODO This is game specific!
+    const matchPlayersSettings = Object.fromEntries(
+      userIds.map((userId, i) => [userId, { color: i.toString() }]),
+    );
+
+    match = new Match({
+      game,
+      matchSettings,
+      matchPlayersSettings,
+      matchData,
+      gameData,
+      players,
+      locale,
+    });
+  }
+
+  return match;
+};
 
 async function render({
   game,
@@ -667,7 +625,7 @@ async function render({
   }
 
   const urlParams = new URLSearchParams(window.location.search);
-  const locale = urlParams.get("l") as Locale;
+  let locale = urlParams.get("l") as Locale;
   const isRules = urlParams.get("v") === "rules";
 
   if (isRules) {
@@ -685,8 +643,10 @@ async function render({
 
   // Is it the player's board?
   if (userId !== null) {
+    const match = ((window.top as any).lefun as Lefun).match;
     const content = (
       <BoardForPlayer
+        match={match}
         board={await board()}
         userId={userId}
         messages={messages[locale]}
@@ -699,26 +659,66 @@ async function render({
 
   // If we are here it's because we want to return the <Main> host.
 
-  // We use `window.lefun` to communicate between the host and the player boards.
-  (window as any).lefun = {};
+  // Setup our local state store. It will try to load some variables from local
+  // storage.
+  const locales = (Object.keys(messages) || ["en"]) as Locale[];
+  const store = createStore({
+    locales,
+  });
+
+  // sanity check
+  if (locale) {
+    throw new Error("locale should not be defined at this point");
+  }
+
+  locale = store.getState().locale;
+
+  const resetMatch = ({
+    tryToLoadFromLocaleStorage = false,
+    numPlayers,
+    locale,
+  }: {
+    tryToLoadFromLocaleStorage?: boolean;
+    numPlayers?: number;
+    locale?: Locale;
+  }) => {
+    {
+      const match = store.getState().match;
+      numPlayers ??=
+        Object.keys(match?.players || {}).length || game.minPlayers;
+    }
+
+    locale ??= store.getState().locale;
+    const match = initMatch({
+      game,
+      matchData,
+      gameData,
+      matchSettings,
+      locale,
+      numPlayers,
+      tryToLoadFromLocaleStorage,
+    });
+
+    // We use `window.lefun` to communicate between the host and the player boards.
+    (window as any).lefun = { match };
+
+    saveMatchToLocalStorage(match);
+
+    store.setState(() => ({ match }));
+  };
+
+  store.setState(() => ({ resetMatch }));
+
+  resetMatch({
+    tryToLoadFromLocaleStorage: true,
+    locale,
+    numPlayers: game.minPlayers,
+  });
 
   // We import the CSS using the package name because this is what will be needed by packages importing this.
   // @ts-expect-error Make typescript happy.
   await import("@lefun/dev-server/index.css");
-  const locales = (Object.keys(messages) || ["en"]) as Locale[];
-  let content = (
-    <Main
-      game={game}
-      matchSettings={matchSettings}
-      matchData={matchData}
-      gameData={gameData}
-    />
-  );
-
-  const store = createStore({
-    numPlayers: game.minPlayers,
-    locales,
-  });
+  let content = <Main />;
 
   content = (
     <MainStoreContext.Provider value={store}>
