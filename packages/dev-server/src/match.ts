@@ -18,12 +18,18 @@ type State = {
 
 type G = Game<GameStateBase, any>;
 
+// We increment this every time we make backward incompatible changes in the match
+// saved to local storage. We save this version with the match to later detect that
+// a saved match is too old.
+const VERSION = 1;
+
 class Match extends EventTarget {
   random: Random;
   game: G;
   players: Record<UserId, User>;
   matchData: unknown;
   gameData: unknown;
+  gameId?: string;
 
   // Store that represents the backend.
   // We need to put it in a zustand Store because we want the JSON view in the right
@@ -37,6 +43,7 @@ class Match extends EventTarget {
     matchPlayersSettings,
     matchData,
     gameData,
+    gameId,
     locale,
     //
     state,
@@ -47,6 +54,7 @@ class Match extends EventTarget {
     matchPlayersSettings?: MatchPlayersSettings;
     matchData?: unknown;
     gameData?: unknown;
+    gameId?: string;
     locale?: Locale;
     //
     state?: State;
@@ -60,6 +68,7 @@ class Match extends EventTarget {
     this.players = players;
     this.matchData = matchData;
     this.gameData = gameData;
+    this.gameId = gameId;
 
     if (state) {
       this.store = createStore(() => state as State);
@@ -240,14 +249,27 @@ class Match extends EventTarget {
 
   serialize(): string {
     const state = this.store.getState();
-    const { players, matchData, gameData } = this;
-    return JSON.stringify({ state, players, matchData, gameData });
+    const { players, matchData, gameData, gameId } = this;
+    return JSON.stringify({
+      state,
+      players,
+      matchData,
+      gameData,
+      gameId,
+      version: VERSION,
+    });
   }
 
   static deserialize(str: string, game: Game<any, any>): Match {
     const obj = JSON.parse(str);
-    const { state, players, matchData, gameData } = obj;
-    return new Match({ state, players, matchData, gameData, game });
+    const { state, players, matchData, gameData, gameId, version } = obj;
+
+    // Currently we don't even try to maintain backward compatiblity here.
+    if (version !== VERSION) {
+      throw new Error(`unsupported version ${version}`);
+    }
+
+    return new Match({ state, players, matchData, gameData, game, gameId });
   }
 }
 
@@ -287,12 +309,19 @@ export function separatePatchesByUser({
   }
 }
 
-function saveMatchToLocalStorage(match: Match) {
-  localStorage.setItem("match", match.serialize());
+function matchKey(gameId?: string) {
+  return `match${gameId ? `.${gameId}` : ""}`;
 }
 
-function loadMatchFromLocalStorage(game: Game<any, any>): Match | null {
-  const str = localStorage.getItem("match");
+function saveMatchToLocalStorage(match: Match, gameId?: string) {
+  localStorage.setItem(matchKey(gameId), match.serialize());
+}
+
+function loadMatchFromLocalStorage(
+  game: Game<any, any>,
+  gameId?: string,
+): Match | null {
+  const str = localStorage.getItem(matchKey(gameId));
 
   if (!str) {
     return null;
@@ -301,7 +330,7 @@ function loadMatchFromLocalStorage(game: Game<any, any>): Match | null {
   try {
     return Match.deserialize(str, game);
   } catch (e) {
-    console.error("Failed to deserialize match", e);
+    console.warn("Failed to deserialize match", e);
     return null;
   }
 }

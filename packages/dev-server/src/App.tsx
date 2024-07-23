@@ -132,7 +132,7 @@ const BoardForPlayer = ({
       }
 
       match.makeMove(userId, moveName, payload);
-      saveMatchToLocalStorage(match);
+      saveMatchToLocalStorage(match, match.gameId);
     });
 
     storeRef.current = store;
@@ -544,6 +544,7 @@ const initMatch = ({
   locale,
   numPlayers,
   tryToLoadFromLocaleStorage = false,
+  gameId,
 }: {
   game: Game<any, any>;
   matchData: unknown;
@@ -552,19 +553,12 @@ const initMatch = ({
   locale: Locale;
   numPlayers: number;
   tryToLoadFromLocaleStorage?: boolean;
+  gameId?: string;
 }) => {
   let match: Match | null = null;
 
   if (tryToLoadFromLocaleStorage) {
-    match = loadMatchFromLocalStorage(game);
-  }
-
-  // Sanity check to make sure the match is valid.
-  if (match) {
-    const numPlayers = Object.keys(match.players).length;
-    if (numPlayers > game.maxPlayers || numPlayers < game.minPlayers) {
-      match = null;
-    }
+    match = loadMatchFromLocalStorage(game, gameId);
   }
 
   if (match === null) {
@@ -596,6 +590,7 @@ const initMatch = ({
       gameData,
       players,
       locale,
+      gameId,
     });
   }
 
@@ -611,6 +606,7 @@ async function render({
   gameData,
   idName = "home",
   messages = { en: {} },
+  gameId = undefined,
 }: {
   game: Game<any, any>;
   board: () => Promise<ReactNode>;
@@ -620,6 +616,7 @@ async function render({
   gameData?: any;
   idName?: string;
   messages?: AllMessages;
+  gameId?: string;
 }) {
   function renderComponent(content: ReactNode) {
     const container = document.getElementById(idName);
@@ -700,12 +697,13 @@ async function render({
       locale,
       numPlayers,
       tryToLoadFromLocaleStorage,
+      gameId,
     });
 
     // We use `window.lefun` to communicate between the host and the player boards.
     (window as any).lefun = { match };
 
-    saveMatchToLocalStorage(match);
+    saveMatchToLocalStorage(match, gameId);
 
     store.setState(() => ({ match }));
   };

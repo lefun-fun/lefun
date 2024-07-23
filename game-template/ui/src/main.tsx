@@ -16,4 +16,5 @@ render({
   },
   game,
   messages: { en, fr },
+  gameId: "roll",
 });
