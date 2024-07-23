@@ -87,6 +87,9 @@ const BoardForPlayer = ({
     });
 
     setMakeMove((store) => (moveName, payload) => {
+      if (userId === "spectator") {
+        return;
+      }
       const { canDo, executeNow } = match.game.playerMoves[moveName];
 
       {

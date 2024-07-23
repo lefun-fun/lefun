@@ -127,6 +127,11 @@ class Match extends EventTarget {
       throw new Error("we still have bugs with those userId in moves");
     }
 
+    if (!this.players[userId]) {
+      console.warn(`user "${userId}" not in match`);
+      return;
+    }
+
     if (!this.store) {
       throw new Error("no store");
     }
