@@ -12,7 +12,7 @@ import {
   useUsername,
 } from "@lefun/ui";
 
-import type { RollGame, RollGameState } from "roll-game";
+import type { RollGame, RollGameState } from "game1-v2.3.0-game";
 
 // Dice symbol characters
 const DICE = ["", "\u2680", "\u2681", "\u2682", "\u2683", "\u2684", "\u2685"];

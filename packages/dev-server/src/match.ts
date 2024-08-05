@@ -8,7 +8,7 @@ import {
   User,
   UserId,
 } from "@lefun/core";
-import { Game, GameStateBase, Random } from "@lefun/game";
+import { Game, GameStateBase, MoveSideEffects, Random } from "@lefun/game";
 
 type State = {
   board: unknown;
@@ -107,6 +107,7 @@ class Match extends EventTarget {
         random,
         areBots,
         locale,
+        ts: new Date().getTime(),
       });
 
       const { board, secretboard = {} } = initialBoards;
@@ -154,6 +155,31 @@ class Match extends EventTarget {
     );
     patchesByUserId["spectator"] = [];
 
+    const sideEffects: MoveSideEffects = {
+      delayMove() {
+        console.warn("delayMove not implemented yet");
+        return { ts: 0 };
+      },
+      endMatch() {
+        console.warn("endMatch not implemented");
+      },
+      logPlayerStat() {
+        console.warn("logPlayerStat not implemented");
+      },
+      logMatchStat() {
+        console.warn("logMatchStat not implemented");
+      },
+      turns: {
+        begin() {
+          console.warn("turns.begin not implemented");
+          return { expiresAt: 0 };
+        },
+        end() {
+          console.warn("turns.end not implemented");
+        },
+      },
+    };
+
     if (executeNow) {
       // Also run `executeNow` on the local state.
       this.store.setState((state: State) => {
@@ -169,10 +195,8 @@ class Match extends EventTarget {
               userId,
               board,
               playerboard: playerboards[userId],
-              delayMove: () => {
-                console.warn("delayMove not implemented yet");
-                return { ts: 0 };
-              },
+              _: sideEffects,
+              ...sideEffects,
             });
           },
         );
@@ -210,19 +234,8 @@ class Match extends EventTarget {
               gameData,
               random,
               ts: now,
-              delayMove: () => {
-                console.warn("delayMove not implemented yet");
-                return { ts: 0 };
-              },
-              endMatch: () => {
-                console.warn("todo implement endMatch");
-              },
-              itsYourTurn: () => {
-                console.warn("todo implement itsYourTurn");
-              },
-              logStat: () => {
-                console.warn("todo implement logStats");
-              },
+              _: sideEffects,
+              ...sideEffects,
             });
           },
         );

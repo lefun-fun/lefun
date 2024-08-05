@@ -8,9 +8,6 @@ export type UserId = string;
 export type Locale = "fr" | "en";
 export const LOCALES: Locale[] = ["fr", "en"];
 
-export type Scores = Record<UserId, number>;
-export type ScoreType = "seconds" | "rank" | "integer";
-
 /*
  * We have some game definition types here, namely the ones used not only in the game
  * but also on the website.
@@ -107,11 +104,55 @@ export type GamePlayerSetting = {
 // "gamePlayerSettings" that we store.
 export type GamePlayerSettings = Record<string, GamePlayerSetting>;
 
-export type GameStat = {
-  key: string;
+export type GameStatType =
+  | "integer"
+  | "rank"
+  | "seconds"
+  | "boolean"
+  // integer or float
+  | "number";
+
+type StatKey = string;
+
+export type GameStat<K extends StatKey = StatKey> = {
+  key: K;
+  type: GameStatType;
+
+  // Defaults to `higherIsBetter`.
+  ordering?: "higherIsBetter" | "lowerIsBetter";
+
+  determinesRank?: boolean;
+  // Should we use this stat to make a leaderboard? Defaults to `false`.
+  // Note that currently we assume that this can only apply to *match* stats.
+  leaderboard?: boolean;
 };
+
+export type GameStat_ = Omit<
+  Required<GameStat>,
+  "determinesRank" | "leaderboard"
+>;
+
 export type GameStats = GameStat[];
+
+export type GameStats_ = {
+  allIds: StatKey[];
+  byId: Record<StatKey, GameStat_>;
+  // We use an array because I feel that later we'll want multiple leaderboards for
+  // different scores (e.g. 3bv in Eggsplosion) but currently we only use the first
+  // one for a single leaderboard per game.
+  leaderboard: StatKey[];
+  determinesRank: StatKey[];
+};
 
 export type Credits = {
   design?: string[];
 };
+
+// Some conditional type utilities.
+export type IfNull<T, Y, N> = [T] extends [null] ? Y : N;
+export type IfAny<T, Y, N> = 0 extends 1 & T ? Y : N;
+export type IfAnyNull<T, ANY, NULL, OTHER> = IfAny<
+  T,
+  ANY,
+  IfNull<T, NULL, OTHER>
+>;

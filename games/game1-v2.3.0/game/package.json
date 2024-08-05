@@ -1,5 +1,5 @@
 {
-  "name": "roll-game",
+  "name": "game1-v2.3.0-game",
   "version": "1.0.0",
   "description": "Game logic for the minimal example game 'Roll'",
   "author": "Simon Lemieux",
@@ -18,11 +18,11 @@
   "devDependencies": {
     "@lefun/core": "workspace:*",
     "@lefun/game": "workspace:*",
-    "rollup": "^4.18.1",
+    "rollup": "^4.20.0",
     "rollup-plugin-typescript2": "^0.36.0",
     "tslib": "^2.6.3",
-    "typescript": "^5.5.3",
-    "vitest": "^1.6.0"
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
   },
   "peerDependencies": {
     "@lefun/core": "workspace:*",

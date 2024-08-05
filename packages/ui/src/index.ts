@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo } from "react";
 import { StoreApi, useStore as _useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
-import type { MatchState as _MatchState, UserId } from "@lefun/core";
+import type { IfAnyNull, MatchState as _MatchState, UserId } from "@lefun/core";
 import type { Game, GameStateBase, GetPayload } from "@lefun/game";
 
 // In the selectors, assume that the boards are defined. We will add a check in the
@@ -27,38 +27,37 @@ export type Store<GS extends GameStateBase = GameStateBase> = StoreApi<
 
 export const storeContext = createContext<Store | null>(null);
 
-type IfNever<T, TRUE, FALSE> = [T] extends [never] ? TRUE : FALSE;
-
-type MakeMove<G extends Game<any, any>> = <
-  K extends keyof G["playerMoves"] & string,
->(
+type MakeMove<G extends Game> = <K extends keyof G["playerMoves"] & string>(
   moveName: K,
-  ...payload: IfNever<GetPayload<G, K>, [], [GetPayload<G, K>]>
-) => void;
-
-type MakeMoveFull<G extends Game<any, any>> = <
-  K extends keyof G["playerMoves"] & string,
->(
-  moveName: K,
-  ...payload: IfNever<
+  ...payload: IfAnyNull<
     GetPayload<G, K>,
-    [GetPayload<G, K> | undefined],
+    // any
+    [] | [any],
+    // null
+    [],
+    // other
     [GetPayload<G, K>]
   >
 ) => void;
 
-let _makeMove: ((store: Store) => MakeMoveFull<any>) | null = null;
+type MakeMoveFull<G extends Game> = <K extends keyof G["playerMoves"] & string>(
+  moveName: K,
+  payload: GetPayload<G, K>,
+) => void;
+
+let _makeMove: (<G extends Game>(store: Store) => MakeMoveFull<G>) | null =
+  null;
 
 export function setMakeMove(
-  makeMove: (store: Store) => MakeMoveFull<Game<any, any>>,
+  makeMove: <G extends Game>(store: Store) => MakeMoveFull<G>,
 ) {
   _makeMove = makeMove;
 }
 
-type GetGameStatesFromGame<G extends Game<any, any>> =
-  G extends Game<infer GS, any> ? GS : never;
+type GetGameStatesFromGame<G extends Game> =
+  G extends Game<infer GS> ? GS : never;
 
-export function useMakeMove<G extends Game<any, any>>(): MakeMove<G> {
+export function useMakeMove<G extends Game = Game>(): MakeMove<G> {
   const makeMove = _makeMove;
 
   if (!makeMove) {
@@ -78,20 +77,25 @@ export function useMakeMove<G extends Game<any, any>>(): MakeMove<G> {
   // `_makeMove` returns a new function every time it's called, but we don't want to
   // re-render.
   return useMemo(() => {
-    const makeMovefull = makeMove(store);
+    const makeMovefull = makeMove<G>(store);
 
     function newMakeMove<K extends keyof G["playerMoves"] & string>(
       moveName: K,
-      ...payload: IfNever<GetPayload<G, K>, [], [GetPayload<G, K>]>
+      ...payload: IfAnyNull<
+        GetPayload<G, K>,
+        [] | [any],
+        [],
+        [GetPayload<G, K>]
+      >
     ) {
-      return makeMovefull(moveName, payload[0] || {});
+      return makeMovefull(moveName, payload[0] || null);
     }
 
     return newMakeMove;
   }, [store, makeMove]);
 }
 
-export function makeUseMakeMove<G extends Game<any, any>>() {
+export function makeUseMakeMove<G extends Game>() {
   return useMakeMove<G>;
 }
 

@@ -5,5 +5,5 @@ packages:
   - packages/ui-testing
   - packages/dev-server
   #
-  - game-template/game
-  - game-template/ui
+  - games/*/game
+  - games/*/ui

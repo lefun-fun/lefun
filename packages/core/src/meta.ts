@@ -1,5 +1,4 @@
-import { getRanks } from "./scores";
-import { Locale, Scores, ScoreType, UserId } from "./types";
+import { Locale, UserId } from "./types";
 
 export interface Players {
   // List of all the player ids for the match.
@@ -14,13 +13,6 @@ export type MatchPlayerSettings = Record<string, string>;
 export type MatchPlayersSettings = Record<UserId, MatchPlayerSettings>;
 
 export type MatchSettings = Record<string, string>;
-
-export type EndMatchOptions = {
-  // When there is one score for the whole match.
-  score?: number;
-  // For cases where there is one score per player.
-  scores?: Scores;
-};
 
 /*
  * Player info that is common to all games. A Player is a User in a Match.
@@ -74,14 +66,6 @@ export type Meta = {
   // For some games we use this locale to determine which locale to use in the match.
   // Optional only for backward compatibility: older matches won't have this field.
   locale?: Locale;
-};
-
-export type ItsYourTurnPayload = {
-  // Start the turn of these users. (defaults to []).
-  userIds?: UserId[] | "all";
-  // End the turn of these users (defaults to 'all' IF `userIds` is defined; when both
-  // `userIds` and `overUserIds` are undefined, we don't change the turns.).
-  overUserIds?: UserId[] | "all";
 };
 
 export const metaInitialState = ({
@@ -162,91 +146,29 @@ export const metaRemoveUserFromMatch = (meta: Meta, userId: UserId): void => {
   meta.players.allIds.splice(idx, 1);
 };
 
-/* Update `meta` inplace at the end of a match.
- */
-export const metaMatchEnded = (
-  meta: Meta,
-  endMatchOptions: EndMatchOptions,
-  playerScoreType?: ScoreType,
-): void => {
-  const { score, scores } = endMatchOptions;
-
-  if (score != null) {
-    meta.score = score;
-  }
-
-  if (scores != null) {
-    if (!playerScoreType) {
-      throw new Error('the "playerScoreType" must be provided with "scores"');
-    }
-    const ranks = getRanks({ scores, scoreType: playerScoreType });
-
-    Object.entries(scores).forEach(([userId, score]) => {
-      const playerInfo = meta.players.byId[userId];
-      if (playerInfo == null) {
-        console.warn(
-          `Trying to set the score for user ${userId} who is not in "meta"`,
-        );
-      } else {
-        playerInfo.score = score;
-        const rank = ranks[userId];
-        if (rank !== undefined) {
-          playerInfo.rank = rank;
-        }
-      }
-    });
-  }
-};
-
-const setPlayerTurn = (meta: Meta, userId: UserId, value: boolean) => {
-  const player = meta.players.byId[userId];
-  if (!player) {
-    console.warn(
-      `Trying to set itsYourTurn for user ${userId} who is not in "meta"`,
-    );
-    return;
-  }
-  player.itsYourTurn = value;
-};
-
-export const metaItsYourTurn = (
-  meta: Meta,
-  itsYourTurn: ItsYourTurnPayload,
-): void => {
-  let { userIds, overUserIds } = itsYourTurn;
-
-  // Deal with default values.
-  if (userIds === undefined && overUserIds === undefined) {
-    // Nothing to do if neither `userIds` nor `overUserIds` is defined.
-    return;
-  }
-
-  // At this point at least one of `userIds` and `overUserIds` is defined.
-
-  if (userIds === undefined) {
-    // If only `overUserIds` is defined, we don't start the turn of any player.
-    userIds = [];
-  }
-
-  if (overUserIds === undefined) {
-    // If only `userIds` is defined, we end everyone's else's turns.
-    overUserIds = "all";
-  }
-
-  // End turns.
-  if (overUserIds === "all") {
-    overUserIds = meta.players.allIds;
-  }
-
-  for (const userId of overUserIds) {
-    setPlayerTurn(meta, userId, false);
-  }
-
-  // Start turns.
+export const metaSetTurns = ({
+  meta,
+  userIds,
+  value,
+}: {
+  meta: Meta;
+  userIds: UserId | UserId[] | "all";
+  value: boolean;
+}): void => {
   if (userIds === "all") {
     userIds = meta.players.allIds;
+  } else if (!Array.isArray(userIds)) {
+    userIds = [userIds];
   }
+
   for (const userId of userIds) {
-    setPlayerTurn(meta, userId, true);
+    const player = meta.players.byId[userId];
+    if (!player) {
+      console.warn(
+        `Trying to set itsYourTurn for user ${userId} who is not in "meta"`,
+      );
+      continue;
+    }
+    player.itsYourTurn = value;
   }
 };

@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: 20
           cache: "pnpm"
-      - run: make init
+      - run: make install
       - run: make build
       - run: make check-format
       - run: make test

@@ -1,5 +1,5 @@
-.PHONY: init
-init:
+.PHONY: install
+install:
 	pnpm install
 
 .PHONY: build

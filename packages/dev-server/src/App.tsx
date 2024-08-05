@@ -11,7 +11,7 @@ import { createRoot } from "react-dom/client";
 import { createStore as _createStore } from "zustand";
 
 import type { Locale, MatchSettings, UserId, UsersState } from "@lefun/core";
-import { Game } from "@lefun/game";
+import { Game, MoveSideEffects } from "@lefun/game";
 import { setMakeMove, Store, storeContext } from "@lefun/ui";
 
 import {
@@ -111,6 +111,31 @@ const BoardForPlayer = ({
         }
       }
 
+      const sideEffects: MoveSideEffects = {
+        delayMove() {
+          console.warn("delayMove not implemented yet");
+          return { ts: 0 };
+        },
+        endMatch() {
+          //
+        },
+        logPlayerStat() {
+          //
+        },
+        logMatchStat() {
+          //
+        },
+        turns: {
+          begin() {
+            console.warn("turns.begin not implemented");
+            return { expiresAt: 0 };
+          },
+          end() {
+            //
+          },
+        },
+      };
+
       if (executeNow) {
         // Optimistic update directly on the `store` of the player making the move.
         store.setState((state: MatchState) => {
@@ -121,10 +146,8 @@ const BoardForPlayer = ({
               board,
               playerboard,
               payload,
-              delayMove: () => {
-                console.warn("delayMove not implemented yet");
-                return { ts: 0 };
-              },
+              _: sideEffects,
+              ...sideEffects,
             });
           });
           return newState;
