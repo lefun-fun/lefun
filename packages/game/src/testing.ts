@@ -1,14 +1,10 @@
 import {
-  EndMatchOptions,
-  ItsYourTurnPayload,
   Locale,
   MatchPlayerSettings,
   MatchSettings,
   Meta,
   metaAddUserToMatch,
   metaInitialState,
-  metaItsYourTurn,
-  metaMatchEnded,
   metaRemoveUserFromMatch,
   UserId,
 } from "@lefun/core";
@@ -19,6 +15,7 @@ import {
   AutoMove,
   AutoMoveInfo,
   BotMove,
+  DelayMove,
   Game,
   Game_,
   GameStateBase,
@@ -27,25 +24,48 @@ import {
   INIT_MOVE,
   KICK_PLAYER,
   MATCH_WAS_ABORTED,
+  // MoveTypesBase,
   parseBotMove,
   parseGame,
   RewardPayload,
+  Turns,
 } from "./gameDef";
 import { Random } from "./random";
-import { IfNever } from "./typing";
+import { IfNever, IfUnknown } from "./typing";
+import { parseMove, parseTurnUserIds } from "./utils";
 
-type DelayedBoardMove = {
+type DelayedPlayerMove = {
+  type: "playerMove";
   name: string;
   payload: any;
   ts: number;
+  userId: UserId;
 };
 
-type MatchTesterOptions<GS extends GameStateBase, G extends Game<GS, any>> = {
-  game: Game<GS, any>;
+// The main different with DelayedPlayerMove is that userId is optional.
+type DelayedBoardMove = {
+  type: "boardMove";
+  name: string;
+  payload: any;
+  ts: number;
+  // We still need the `userId` when it's a move that is triggered when the player's turn expires.
+  userId?: UserId;
+};
+
+type DelayedMove = DelayedBoardMove | DelayedPlayerMove;
+
+export type MatchTesterOptions<
+  GS extends GameStateBase,
+  G extends Game<GS>, //, PMT, BMT>,
+  // PMT extends MoveTypesBase = MoveTypesBase,
+  // BMT extends MoveTypesBase = MoveTypesBase,
+> = {
+  game: G;
   getAgent?: GetAgent<GS, G>;
   autoMove?: AutoMove<GS, G>;
   gameData?: any;
   matchData?: any;
+  // Num *human* players
   numPlayers: number;
   numBots?: number;
   matchSettings?: MatchSettings;
@@ -76,16 +96,37 @@ type User = {
 
 type UsersState = { byId: Record<UserId, User> };
 
+type MakeMoveOptions = { canFail?: boolean; isDelayed?: boolean };
+
 type MakeMoveRest<
-  G extends Game<any, any>,
+  G extends Game<any>,
   K extends keyof G["playerMoves"] & string,
-> = IfNever<
+> = IfUnknown<
   GetPayload<G, K>,
-  //
-  [] | [EmptyObject, { canFail?: boolean }],
-  //
-  [GetPayload<G, K>] | [GetPayload<G, K>, { canFail?: boolean }]
+  [] | [any] | [any, MakeMoveOptions],
+  IfNever<
+    GetPayload<G, K>,
+    //
+    [] | [EmptyObject, MakeMoveOptions],
+    //
+    [GetPayload<G, K>] | [GetPayload<G, K>, MakeMoveOptions]
+  >
 >;
+
+/*
+type GenericPlayerMove = {
+  name: string;
+  payload: unknown;
+};
+
+function parsePlayerMove(moveObj: MoveObj<any>): GenericPlayerMove {
+  if (typeof moveObj === "string") {
+    return { name: moveObj, payload: undefined };
+  }
+  const [name, payload = undefined] = moveObj;
+  return { name, payload };
+}
+*/
 
 /*
  * Use this to test your game rules.
@@ -93,10 +134,11 @@ type MakeMoveRest<
  */
 export class MatchTester<
   GS extends GameStateBase,
-  G extends Game<GS, any>,
-  BMT extends Record<string, any> = any,
+  G extends Game<GS>, //, PMT, BMT>,
+  // PMT extends MoveTypesBase = MoveTypesBase,
+  // BMT extends MoveTypesBase = MoveTypesBase,
 > {
-  game: Game_<GS, BMT>;
+  game: Game_<GS>; //, PMT, BMT>;
   autoMove?: AutoMove<GS, G>;
   getAgent?: GetAgent<GS, G>;
   gameData: any;
@@ -113,7 +155,13 @@ export class MatchTester<
   // Clock used for delayedMoves - in ms.
   time: number;
   // List of timers to be executed.
-  delayedMoves: DelayedBoardMove[];
+  delayedMoves: DelayedMove[];
+  // List of end of turn player moves.
+  // endOfTurnPlayerMoves: Record<UserId, DelayedMove[]>;
+
+  // List of end of turn board moves.
+  // endOfTurnBoardMoves: Record<UserId, BMT>;
+
   // To help generate the next userIds.
   nextUserId: number;
   // Variables to check for infinite loops.
@@ -128,6 +176,10 @@ export class MatchTester<
   _training: boolean;
   _agents: Record<UserId, Agent<GS, G>>;
   _isPlaying: boolean;
+
+  // This is hacky. We need some place to store the userIds of the players whose turn
+  // begins after a move.
+  _lastTurnsBegin: Set<UserId>;
 
   constructor({
     game,
@@ -232,12 +284,9 @@ export class MatchTester<
       ]),
     );
 
-    const {
-      board,
-      playerboards = {},
-      secretboard = {} as GS["SB"],
-      itsYourTurnUsers = [],
-    } = game.initialBoards({
+    const time = 0;
+
+    const init = game.initialBoards({
       players: meta.players.allIds,
       matchSettings,
       matchPlayersSettings,
@@ -247,11 +296,10 @@ export class MatchTester<
       areBots,
       // What about `previousBoard`?
       locale,
+      ts: time,
     });
 
-    itsYourTurnUsers.forEach((userId) => {
-      meta.players.byId[userId].itsYourTurn = true;
-    });
+    const { board, playerboards = {}, secretboard = {} as GS["SB"] } = init;
 
     const users: UsersState = { byId: {} };
     meta.players.allIds.forEach((userId) => {
@@ -272,15 +320,13 @@ export class MatchTester<
     this.matchHasEnded = false;
     this.random = random;
     this.meta = meta;
-    this.time = 0;
+    this.time = time;
     this.delayedMoves = [];
+    // this.endOfTurnPlayerMoves = {};
     this.users = users;
     this.matchSettings = matchSettings;
     this.matchPlayersSettings = matchPlayersSettings;
     this._sameBotCount = 0;
-
-    // Make the special initial move.
-    this._makeBoardMove(INIT_MOVE);
 
     this._botTrainingLog = [];
     this._stats = [];
@@ -290,6 +336,10 @@ export class MatchTester<
     this._agents = {};
 
     this._isPlaying = false;
+    this._lastTurnsBegin = new Set();
+
+    // Make the special initial move.
+    this._makeBoardMove(INIT_MOVE);
   }
 
   /*
@@ -357,7 +407,7 @@ export class MatchTester<
    * For the end of the match, as happens when all the players vote to end the match.
    */
   abortMatch(): void {
-    this._endMatch({});
+    this._endMatch();
     this._makeBoardMove(MATCH_WAS_ABORTED);
   }
 
@@ -366,10 +416,10 @@ export class MatchTester<
    *
    * This is also called if the game triggers the special `endMatch(..)` move.
    */
-  _endMatch(endMatchOptions: EndMatchOptions): void {
+  _endMatch(): void {
     this.matchHasEnded = true;
 
-    metaMatchEnded(this.meta, endMatchOptions, this.game.playerScoreType);
+    // metaMatchEnded(this.meta);
 
     // It's no-one's turn anymore.
     this.meta.players.allIds.forEach((userId) => {
@@ -388,8 +438,8 @@ export class MatchTester<
   }
 
   makeSpecialExecuteFuncs() {
-    const endMatch = (options?: EndMatchOptions) => {
-      this._endMatch(options || {});
+    const endMatch = () => {
+      this._endMatch();
     };
 
     const reward = (payload: RewardPayload) => {
@@ -399,35 +449,119 @@ export class MatchTester<
       }
     };
 
+    /*
     const itsYourTurn = (payload: ItsYourTurnPayload): void => {
       if (this.matchHasEnded) {
         return;
       }
       metaItsYourTurn(this.meta, payload);
     };
+    */
 
-    const delayMove = <K extends keyof BMT & string>(
-      name: K,
-      ...payloadAndDelay: IfNever<BMT[K], [number], [BMT[K], number]>
+    const turnsbegin: Turns<any, any>["begin"] = (
+      userIds,
+      { expiresIn, boardMoveOnExpire, playerMoveOnExpire } = {},
+    ) => {
+      userIds = parseTurnUserIds(userIds, {
+        allUserIds: this.meta.players.allIds,
+      });
+      for (const userId of userIds) {
+        this._lastTurnsBegin.add(userId);
+        // Clear previous turn player moves for that player.
+        this.delayedMoves = this.delayedMoves.filter(
+          ({ userId: otherUserId }) => otherUserId !== userId,
+        );
+
+        this.meta.players.byId[userId].itsYourTurn = true;
+        if (playerMoveOnExpire) {
+          const { name, payload } = parseMove(playerMoveOnExpire);
+          if (expiresIn === undefined) {
+            throw new Error("expiresIn is required for playerMoveOnExpire");
+          }
+
+          this.delayedMoves.push({
+            type: "playerMove",
+            name,
+            payload,
+            ts: this.time + expiresIn,
+            userId,
+          });
+        }
+
+        // Note that it is one boardMove per user.
+        if (boardMoveOnExpire) {
+          const { name, payload } = parseMove(boardMoveOnExpire);
+          if (expiresIn === undefined) {
+            throw new Error("expiresIn is required for playerMoveOnExpire");
+          }
+          this.delayedMoves.push({
+            type: "boardMove",
+            name,
+            payload,
+            ts: this.time + expiresIn,
+            // We need the `userId` to stop it if the player makes a move.
+            userId,
+          });
+        }
+      }
+    };
+
+    const turnsEnd: Turns<any, any>["end"] = (userIds) => {
+      userIds = parseTurnUserIds(userIds, {
+        allUserIds: this.meta.players.allIds,
+      });
+      for (const userId of userIds) {
+        this._lastTurnsBegin.delete(userId);
+        this.meta.players.byId[userId].itsYourTurn = false;
+
+        // Clear previous turn player moves for that player.
+        this.delayedMoves = this.delayedMoves.filter(
+          ({ userId: otherUserId }) => otherUserId !== userId,
+        );
+      }
+    };
+
+    // const isTurn: Turns<any, any>["isTurn"] = (userId) => {
+    //   return this.meta.players.byId[userId].itsYourTurn;
+    // };
+
+    const turns: Turns<any, any> = {
+      end: turnsEnd,
+      begin: turnsbegin,
+      // isTurn,
+    };
+
+    const delayMove: DelayMove = (
+      name: string,
+      ...payloadAndDelay: any[] //IfNever<BMT[K], [number], [BMT[K], number]>
     ) => {
       const [payload, delay] =
         payloadAndDelay.length === 1
           ? [{}, payloadAndDelay[0]]
           : payloadAndDelay;
 
-      // const { name, payload } = move;
-      const dm = { name, payload, ts: this.time + delay };
+      const ts = this.time + delay;
+
       // In the match tester, we only note the delayed move. We'll execute them only if
       // we `fastForward`.
-      this.delayedMoves.push(dm);
-      return { ts: dm.ts };
+      this.delayedMoves.push({
+        type: "boardMove" as const,
+        name,
+        payload,
+        ts,
+      });
+      return { ts };
     };
 
-    const logStat = (key: string, value: number) => {
-      this._stats.push({ key, value });
+    const logPlayerStat = () => {
+      //
     };
 
-    return { delayMove, itsYourTurn, endMatch, reward, logStat };
+    const logMatchStat = () => {
+      //
+    };
+
+    return { delayMove, turns, endMatch, reward, logPlayerStat, logMatchStat };
   }
 
   _makeBoardMove(moveName: string, payload: any = {}) {
@@ -479,6 +613,8 @@ export class MatchTester<
       console.warn(`board move "${moveName}" failed with error`);
       console.warn(e);
     }
+
+    this.fastForward(0);
   }
 
   makeMove<K extends keyof G["playerMoves"] & string>(
@@ -486,7 +622,7 @@ export class MatchTester<
     moveName: K,
     ...rest: MakeMoveRest<G, K>
   ) {
-    const [payload, { canFail = false }] =
+    const [payload, { canFail = false, isDelayed = false }] =
       rest.length === 0
         ? [undefined, {}]
         : rest.length === 1
@@ -527,18 +663,23 @@ export class MatchTester<
     const { canDo, executeNow, execute } = game.playerMoves[moveName];
 
     if (
-      canDo !== undefined &&
+      !isDelayed &&
+      canDo &&
       !canDo({ userId, board, playerboard, payload, ts: time })
     ) {
       if (!canFail) {
         throw new Error(`can not do move "${moveName}"`);
       }
+
+      console.warn(`can not do move "${moveName}"`);
       return;
     }
 
     const specialExecuteFuncs = this.makeSpecialExecuteFuncs();
 
-    const { delayMove } = specialExecuteFuncs;
+    const { turns } = specialExecuteFuncs;
+
+    this._lastTurnsBegin.clear();
 
     try {
       let retValue;
@@ -548,7 +689,7 @@ export class MatchTester<
           board,
           playerboard,
           payload,
-          delayMove,
+          ...specialExecuteFuncs,
         });
       }
       if (retValue !== false && execute) {
@@ -572,6 +713,14 @@ export class MatchTester<
       console.warn(e);
       throw new Error("error in move");
     }
+
+    // When a user makes a move, we end their turn (unless the move starts it again).
+    // Remember that this also clears the delayed moves for that player.
+    if (!this._lastTurnsBegin.has(userId)) {
+      turns.end(userId);
+    }
+
+    this.fastForward(0);
   }
 
   async start() {
@@ -599,7 +748,12 @@ export class MatchTester<
     await this.makeNextBotMove();
   }
 
-  async makeNextBotMove() {
+  async makeNextBotMove({ max = null }: { max?: number | null } = {}) {
+    if (!this._isPlaying) {
+      await this.start();
+      // Return because `start` calls makeNextBotMove.
+      return;
+    }
     const { meta, game, autoMove, board, playerboards, secretboard, random } =
       this;
     // Check if we should do a bot move.
@@ -608,7 +762,6 @@ export class MatchTester<
       userIndex < meta.players.allIds.length;
       ++userIndex
     ) {
-      //userId of meta.players.allIds) {
       const userId = meta.players.allIds[userIndex];
       const { isBot, itsYourTurn } = meta.players.byId[userId];
 
@@ -678,11 +831,19 @@ export class MatchTester<
 
         // We only play one bot move per call. The function will be called again if it's
         // another bot's turn after.
-        return await this.makeMoveAndContinue(
+        await this.makeMove(
           userId,
           name,
           ...((payload === undefined ? [] : [payload]) as any),
         );
+
+        // TODO Test this
+        if (max === null || max >= 2) {
+          await this.makeNextBotMove({
+            max: max === null ? null : max - 1,
+          });
+        }
+        return;
       }
     }
     // No bot played this time.
@@ -707,18 +868,37 @@ export class MatchTester<
    */
   fastForward(delta: number): void {
     this.time += delta;
-    // Execute the delayed updates that have happend during that time *in order*. If two
-    // have the same timestamp, execute the one that was queued first.
-    const delayedMoves = this.delayedMoves.filter((du) => du.ts <= this.time);
-    // Sort by time, but keep the order in case of equality.
-    delayedMoves
-      .map((u, i) => [u, i] as [DelayedBoardMove, number])
-      .sort(([u1, i1], [u2, i2]) => Math.sign(u1.ts - u2.ts) || i1 - i2);
 
-    for (const delayedMove of delayedMoves) {
-      const { name, payload } = delayedMove;
-      this._makeBoardMove(name, payload);
+    // We do it in a loop in case moves queue delayed moves in 0ms, which we want to do
+    // right away.
+    for (let i = 0; i < 4096; i++) {
+      const { pastMoves, futureMoves } = splitDelayedMoves(
+        this.delayedMoves,
+        this.time,
+      );
+
+      // When there are no past moves, we can't add more in 0ms, so we are done.
+      if (pastMoves.length === 0) {
+        return;
+      }
+
+      this.delayedMoves = futureMoves;
+
+      for (const delayedMove of pastMoves) {
+        const { type, name, payload, userId } = delayedMove;
+        if (type === "playerMove") {
+          this.makeMove(
+            userId,
+            name,
+            ...([payload, { isDelayed: true }] as any),
+          );
+        } else {
+          this._makeBoardMove(name, payload);
+        }
+      }
     }
+
+    throw new Error("Too many recursions in `fastForward`");
   }
 
   get botTrainingLog() {
@@ -732,4 +912,26 @@ export class MatchTester<
   clearStats() {
     this._stats = [];
   }
+}
+
+// FIXME test this
+/* Filter and sort delayed move before a given timestamp. If two moves have the
+ * same timestamp we keep them in the order they were added. */
+function splitDelayedMoves(
+  delayedMoves: DelayedMove[],
+  ts: number,
+): { pastMoves: DelayedMove[]; futureMoves: DelayedMove[] } {
+  // Execute the delayed updates that have happend during that time *in order*. If two
+  // have the same timestamp, execute the one that was queued first.
+  const pastMoves = delayedMoves
+    .filter((dm) => dm.ts <= ts)
+    // Sort by time, but keep the order in case of equality.
+    .map((dm, i) => [dm, i] as [DelayedMove, number])
+    .sort(([dm1, i1], [dm2, i2]) => Math.sign(dm1.ts - dm2.ts) || i1 - i2)
+    // Back to an object.
+    .map(([dm]) => dm);
+
+  const futureMoves = delayedMoves.filter((dm) => dm.ts > ts);
+
+  return { pastMoves, futureMoves };
 }

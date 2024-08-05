@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "esnext",
+    "module": "esnext",
+    "lib": ["dom", "esnext"],
+    "sourceMap": true,
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "allowSyntheticDefaultImports": true,
+    "allowJs": true,
+    "esModuleInterop": true,
+    "outDir": "dist",
+    "declarationDir": "dist"
+  },
+  "include": ["src/**/*"]
+}

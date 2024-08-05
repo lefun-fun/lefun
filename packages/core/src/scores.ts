@@ -1,5 +1,7 @@
 import { ScoreType, UserId } from ".";
 
+// FIXME Move to `server`. We'll use that to calculate a new stat for all games when it finishes.
+// Unless we want to use it in `dev-server`? Maybe we do.
 /*
  * Given some `scores`, get ranks for players.
  */

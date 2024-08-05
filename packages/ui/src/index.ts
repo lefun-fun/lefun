@@ -27,38 +27,41 @@ export type Store<GS extends GameStateBase = GameStateBase> = StoreApi<
 
 export const storeContext = createContext<Store | null>(null);
 
-type IfNever<T, TRUE, FALSE> = [T] extends [never] ? TRUE : FALSE;
+type IfNull<T, Y, N> = [T] extends [null] ? Y : N;
+type IfAny<T, Y, N> = 0 extends 1 & T ? Y : N;
 
-type MakeMove<G extends Game<any, any>> = <
-  K extends keyof G["playerMoves"] & string,
->(
-  moveName: K,
-  ...payload: IfNever<GetPayload<G, K>, [], [GetPayload<G, K>]>
-) => void;
+type IfAnyNull<T, ANY, NULL, OTHER> = IfAny<T, ANY, IfNull<T, NULL, OTHER>>;
 
-type MakeMoveFull<G extends Game<any, any>> = <
-  K extends keyof G["playerMoves"] & string,
->(
+type MakeMove<G extends Game> = <K extends keyof G["playerMoves"] & string>(
   moveName: K,
-  ...payload: IfNever<
+  ...payload: IfAnyNull<
     GetPayload<G, K>,
-    [GetPayload<G, K> | undefined],
+    // any
+    [] | [any],
+    // null
+    [],
+    // other
     [GetPayload<G, K>]
   >
 ) => void;
 
-let _makeMove: ((store: Store) => MakeMoveFull<any>) | null = null;
+type MakeMoveFull<G extends Game = Game> = <
+  K extends keyof G["playerMoves"] & string,
+>(
+  moveName: K,
+  payload: GetPayload<G, K>,
+) => void;
 
-export function setMakeMove(
-  makeMove: (store: Store) => MakeMoveFull<Game<any, any>>,
-) {
+let _makeMove: ((store: Store) => MakeMoveFull) | null = null;
+
+export function setMakeMove(makeMove: (store: Store) => MakeMoveFull) {
   _makeMove = makeMove;
 }
 
-type GetGameStatesFromGame<G extends Game<any, any>> =
-  G extends Game<infer GS, any> ? GS : never;
+type GetGameStatesFromGame<G extends Game> =
+  G extends Game<infer GS> ? GS : never;
 
-export function useMakeMove<G extends Game<any, any>>(): MakeMove<G> {
+export function useMakeMove<G extends Game>(): MakeMove<G> {
   const makeMove = _makeMove;
 
   if (!makeMove) {
@@ -82,16 +85,21 @@ export function useMakeMove<G extends Game<any, any>>(): MakeMove<G> {
 
     function newMakeMove<K extends keyof G["playerMoves"] & string>(
       moveName: K,
-      ...payload: IfNever<GetPayload<G, K>, [], [GetPayload<G, K>]>
+      ...payload: IfAnyNull<
+        GetPayload<G, K>,
+        [] | [any],
+        [],
+        [GetPayload<G, K>]
+      >
     ) {
-      return makeMovefull(moveName, payload[0] || {});
+      return makeMovefull(moveName, payload[0] || null);
     }
 
     return newMakeMove;
   }, [store, makeMove]);
 }
 
-export function makeUseMakeMove<G extends Game<any, any>>() {
+export function makeUseMakeMove<G extends Game>() {
   return useMakeMove<G>;
 }
 

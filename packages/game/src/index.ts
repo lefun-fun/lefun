@@ -1,3 +1,5 @@
+export * from "./compat";
 export * from "./gameDef";
 export * from "./random";
 export * from "./testing";
+export * from "./utils";

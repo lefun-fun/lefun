@@ -27,4 +27,6 @@ test("inside PlayerMove", () => {
 test("match tester", () => {
   const match = new MatchTester<GS, typeof game>({ game, numPlayers: 2 });
   expectTypeOf(match.board.count).toEqualTypeOf<number>();
+
+  expectTypeOf(match.makeMove).toBeCallableWith("roll");
 });

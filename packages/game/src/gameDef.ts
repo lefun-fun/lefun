@@ -1,25 +1,22 @@
 import {
   AkaType,
   Credits,
-  EndMatchOptions,
   GamePlayerSettings,
   GameSettings,
-  GameStats,
-  ItsYourTurnPayload,
+  GameStat,
   Locale,
   MatchPlayerSettings,
   MatchPlayersSettings,
   MatchSettings,
-  ScoreType,
   UserId,
 } from "@lefun/core";
 
 import { Random } from "./random";
-import { IfNever } from "./typing";
+import { IfNull } from "./typing";
 
-export type GameStateBase = { B: unknown; PB: unknown; SB: unknown };
+export type GameStateBase = { B: any; PB: any; SB: any };
 
-type BMTBase = Record<string, unknown>;
+export type MoveTypesBase = Record<string, any>;
 
 export type GameState<B, PB = EmptyObject, SB = EmptyObject> = {
   B: B;
@@ -27,9 +24,15 @@ export type GameState<B, PB = EmptyObject, SB = EmptyObject> = {
   SB: SB;
 };
 
-type NoPayload = never;
-
 type EmptyObject = Record<string, never>;
+
+// type NoPayload = EmptyObject;
+
+// FIXME tester avec des games differents avec plus ou moins de typing
+// Tout mettre ca dans des tests .d.ts
+export type GameStats = GameStat[];
+
+// Special moves
 
 export const INIT_MOVE = "lefun/initMove";
 
@@ -45,83 +48,173 @@ export type KickPlayerPayload = {
 
 export const MATCH_WAS_ABORTED = "lefun/matchWasAborted";
 
+// We always compute ranks at the end of matches.
+// export const RANK = "lefun/rank";
+
 export type RewardPayload = {
   rewards: Record<UserId, number>;
+  // TODO Now that we have proper stats, we should use those instead.
   stats?: Record<UserId, Record<string, number>>;
 };
 
-export type DelayMove<BMT extends BMTBase> = <K extends keyof BMT & string>(
+export type DelayMove<BMT extends MoveTypesBase = MoveTypesBase> = <
+  K extends keyof BMT & string,
+>(
   moveName: K,
-  ...rest: IfNever<BMT[K], [number], [BMT[K], number]>
+  ...rest: IfAny<
+    BMT[K],
+    [number] | [any, number],
+    IfNull<BMT[K], [number], [BMT[K], number]>
+  >
 ) => { ts: number };
 
-export type SpecialFuncs<BMT extends BMTBase> = {
-  delayMove: DelayMove<BMT>;
-  itsYourTurn: (arg0: ItsYourTurnPayload) => void;
-  endMatch: (arg0?: EndMatchOptions) => void;
-  reward?: (options: RewardPayload) => void;
-  logStat: (key: string, value: number) => void;
+type IfUnknown<T, TRUE, FALSE> = [T] extends [unknown] ? TRUE : FALSE;
+
+type IfAny<T, Y, N> = 0 extends 1 & T ? Y : N;
+
+export type Turns<
+  PMT extends MoveTypesBase = MoveTypesBase,
+  BMT extends MoveTypesBase = MoveTypesBase,
+> = {
+  end: (userIds: UserId | UserId[] | "all") => void;
+  begin: (
+    userIds: UserId | UserId[] | "all",
+    options?: {
+      // FIXME We need to make sure that either boardMoveOnExpire or playerMoveOnExpire is set. Or we need to implement something like ending the turn at expireAt without trigerring any move.
+      expiresIn?: number;
+      // FIXME double check this
+      // boardMoveOnExpire?: string | [string, any] /*IfUnknown<
+      boardMoveOnExpire?: IfUnknown<
+        MoveObjFromMT<BMT>,
+        string | [string, any],
+        IfNull<BMT, never, MoveObjFromMT<BMT>>
+      >;
+      // FIXME test this in a .d.ts file
+      // Basically we want for things to work even when PMT/BMT are not used.
+      // playerMoveOnExpire?: string | [string, any] /*IfUnknown<
+      playerMoveOnExpire?: IfUnknown<
+        MoveObjFromMT<PMT>,
+        string | [string, any],
+        IfNull<PMT, never, MoveObjFromMT<PMT>>
+      >;
+    },
+  ) => void;
+  // isTurn: (userId: UserId) => boolean;
 };
 
-type ExecuteNowOptions<GS extends GameStateBase, P, BMT extends BMTBase> = {
+type StatsKeys<S extends GameStats> = S extends { key: infer K }[] ? K : never;
+
+export type SpecialFuncs<
+  PMT extends MoveTypesBase,
+  BMT extends MoveTypesBase,
+  PS extends GameStats = GameStats,
+  MS extends GameStats = GameStats,
+> = {
+  delayMove: DelayMove<BMT>;
+  turns: Turns<PMT, BMT>;
+  endMatch: () => void;
+  reward?: (options: RewardPayload) => void;
+  logPlayerStat: (userId: UserId, key: StatsKeys<PS>, value: number) => void;
+  logMatchStat: (key: StatsKeys<MS>, value: number) => void;
+  // Backward-compatibility.
+  // itsYourTurn?: (arg0: any) => void;
+};
+
+type ExecuteNowOptions<
+  GS extends GameStateBase,
+  P,
+  PMT extends MoveTypesBase,
+  BMT extends MoveTypesBase,
+  PS extends GameStats,
+  MS extends GameStats,
+> = {
   userId: UserId;
   board: GS["B"];
   // Assume that the game developer has defined the playerboard if they're using it.
   playerboard: GS["PB"];
   payload: P;
-  delayMove: SpecialFuncs<BMT>["delayMove"];
-};
+} & SpecialFuncs<PMT, BMT, PS, MS>;
 
-export type ExecuteNow<G extends GameStateBase, P, BMT extends BMTBase> = (
-  options: ExecuteNowOptions<G, P, BMT>,
+export type ExecuteNow<
+  GS extends GameStateBase = GameStateBase,
+  P = any,
+  PMT extends MoveTypesBase = MoveTypesBase,
+  BMT extends MoveTypesBase = MoveTypesBase,
+  PS extends GameStats = GameStats,
+  MS extends GameStats = GameStats,
+> = (
+  options: ExecuteNowOptions<GS, P, PMT, BMT, PS, MS>,
   // TODO: We should support returning anything and it would be passed to `execute`.
 ) => void | false;
 
-export type ExecuteOptions<G extends GameStateBase, P, BMT extends BMTBase> = {
+export type ExecuteOptions<
+  GS extends GameStateBase,
+  P,
+  PMT extends MoveTypesBase,
+  BMT extends MoveTypesBase,
+  PS extends GameStats,
+  MS extends GameStats,
+> = {
   userId: UserId;
-  board: G["B"];
+  board: GS["B"];
   // Even though `playerboards` and `secretboard` are optional, we'll assume that the
   // game developer has defined them if they use them if their execute* functions!
-  playerboards: Record<UserId, G["PB"]>;
-  secretboard: G["SB"];
+  playerboards: Record<UserId, GS["PB"]>;
+  secretboard: GS["SB"];
   payload: P;
   random: Random;
   ts: number;
   gameData: any;
   matchData?: any;
-} & SpecialFuncs<BMT>;
+} & SpecialFuncs<PMT, BMT, PS, MS>;
 
-export type Execute<G extends GameStateBase, P, BMT extends BMTBase> = (
-  options: ExecuteOptions<G, P, BMT>,
-) => void;
+export type Execute<
+  GS extends GameStateBase = GameStateBase,
+  P = any,
+  PMT extends MoveTypesBase = MoveTypesBase,
+  BMT extends MoveTypesBase = MoveTypesBase,
+  PS extends GameStats = GameStats,
+  MS extends GameStats = GameStats,
+> = (options: ExecuteOptions<GS, P, PMT, BMT, PS, MS>) => void;
 
 export type PlayerMove<
-  G extends GameStateBase,
-  P = NoPayload,
-  BMT extends BMTBase = EmptyObject,
+  GS extends GameStateBase = GameStateBase,
+  P = any,
+  PMT extends MoveTypesBase = MoveTypesBase,
+  BMT extends MoveTypesBase = MoveTypesBase,
+  PS extends GameStats = GameStats,
+  MS extends GameStats = GameStats,
 > = {
   canDo?: (options: {
     userId: UserId;
-    board: G["B"];
-    playerboard: G["PB"];
+    board: GS["B"];
+    playerboard: GS["PB"];
     payload: P;
     // We'll pass `null` on the client, where we don't have the server time.
     ts: number | null;
   }) => boolean;
-  executeNow?: ExecuteNow<G, P, BMT>;
-  execute?: Execute<G, P, BMT>;
+  executeNow?: ExecuteNow<GS, P, PMT, BMT, PS, MS>;
+  execute?: Execute<GS, P, PMT, BMT, PS, MS>;
 };
 
-export type BoardExecute<G extends GameStateBase, P, BMT extends BMTBase> = (
-  options: Omit<ExecuteOptions<G, P, BMT>, "userId">,
-) => void;
+export type BoardExecute<
+  GS extends GameStateBase,
+  P,
+  PMT extends MoveTypesBase,
+  BMT extends MoveTypesBase,
+  PS extends GameStats,
+  MS extends GameStats,
+> = (options: Omit<ExecuteOptions<GS, P, PMT, BMT, PS, MS>, "userId">) => void;
 
 export type BoardMove<
-  G extends GameStateBase,
-  P = NoPayload,
-  BMT extends BMTBase = EmptyObject,
+  GS extends GameStateBase,
+  P = any,
+  PMT extends MoveTypesBase = EmptyObject,
+  BMT extends MoveTypesBase = EmptyObject,
+  PS extends GameStats = GameStats,
+  MS extends GameStats = GameStats,
 > = {
-  execute?: BoardExecute<G, P, BMT>;
+  execute?: BoardExecute<GS, P, PMT, BMT, PS, MS>;
 };
 
 export type InitialBoardsOptions<B> = {
@@ -137,19 +230,20 @@ export type InitialBoardsOptions<B> = {
   // This is used occasionnaly for games with localized data where we don't want to
   // add an gameSetting.
   locale: Locale;
+  // Timestamp at which the match is started.
+  ts: number;
 };
 
-export type InitialPlayerboardOptions<G extends GameStateBase> = {
+export type InitialPlayerboardOptions<GS extends GameStateBase> = {
   userId: UserId;
-  board: G["B"];
-  secretboard: G["SB"];
+  board: GS["B"];
+  secretboard: GS["SB"];
   // Those are the playerboards for the *other* players.
-  playerboards: Record<UserId, G["PB"]>;
+  playerboards: Record<UserId, GS["PB"]>;
   random: Random;
   gameData: any;
   matchData?: any;
 };
-
 /*
  * Object that `autoMove` can return to help train reinforcement learning models.
  */
@@ -185,11 +279,11 @@ export type AutoMoveInfo = {
 };
 
 export type GetPayload<
-  G extends Game<any>,
+  G extends Game,
   K extends keyof G["playerMoves"] & string,
 > =
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  G["playerMoves"][K] extends PlayerMove<infer G, infer P, infer BMT>
+  G["playerMoves"][K] extends PlayerMove<infer G, infer P, infer PMT, infer BMT>
     ? P
     : never;
 
@@ -197,13 +291,17 @@ export type GetPayload<
  * `name: string` if the move doesn't have any payload, [name: string, payload: ?]
  * otherwise.
  */
-type MoveObj<G extends Game<any>> = {
-  [K in keyof G["playerMoves"] & string]: IfNever<
+export type MoveObj<G extends Game> = {
+  [K in keyof G["playerMoves"] & string]: IfNull<
     GetPayload<G, K>,
     K,
     [K, GetPayload<G, K>]
   >;
 }[keyof G["playerMoves"] & string];
+
+type MoveObjFromMT<MT extends MoveTypesBase> = {
+  [K in keyof MT & string]: IfNull<MT[K], K, [K, MT[K]]>;
+}[keyof MT & string];
 
 /*
  * Stateless function that returns a bot move.
@@ -262,16 +360,27 @@ export type GetMatchScoreTextOptions<B> = {
 
 // This is what the game developer must implement.
 export type Game<
-  GS extends GameStateBase,
-  BMT extends BMTBase = EmptyObject,
-  PM extends Record<string, PlayerMove<GS, any, BMT>> = any,
-  BM extends Record<string, BoardMove<GS, any, BMT>> = any,
+  GS extends GameStateBase = GameStateBase,
+  PMT extends MoveTypesBase = MoveTypesBase,
+  BMT extends MoveTypesBase = MoveTypesBase,
+  PM extends Record<string, PlayerMove<GS, any, PMT, BMT>> = Record<
+    string,
+    PlayerMove<GS, any, PMT, BMT>
+  >,
+  BM extends Record<string, BoardMove<GS, any, PMT, BMT>> = Record<
+    string,
+    BoardMove<GS, any, PMT, BMT>
+  >,
 > = {
+  version: string;
   initialBoards: (options: InitialBoardsOptions<GS["B"]>) => {
     board: GS["B"];
     playerboards?: Record<UserId, GS["PB"]>;
     secretboard?: GS["SB"];
-    itsYourTurnUsers?: UserId[];
+    // Backward compatibility
+    // itsYourTurnUsers?: UserId | UserId[] | "all";
+    // New name
+    // itsTheirTurn?: UserId | UserId[] | "all";
   };
   // There is a separate function for the `playerboard` for games that support adding a
   // player into an ongoing match.
@@ -287,12 +396,7 @@ export type Game<
   // Do we have `score`s for this game? This means for instance that we can show
   // a leaderboard.
 
-  // Type of the match score. This is when there is only one score for the match.
-  // This tells us how to format it. A defined matchScoreType also means we can have a leaderboard.
-  matchScoreType?: ScoreType;
-
-  // Type of the player score. This is when there is only one score per player.
-  playerScoreType?: ScoreType;
+  // mainScoreStat ?:
 
   // Games can customize the match score representation using this hook.
   getMatchScoreText?: (options: GetMatchScoreTextOptions<GS["B"]>) => string;
@@ -316,7 +420,18 @@ export type Game<
   // using a search param in the URL.
   useInitialLocale?: boolean;
 
-  stats?: GameStats;
+  playerStats?: GameStats;
+  matchStats?: GameStats;
+}; // & GameCompat;
+
+// type GameCompat = {
+//   matchScoreType?: any;
+//   playerScoreType?: any;
+// };
+
+type Stats_ = {
+  allIds: string[];
+  byId: Record<string, GameStat>;
 };
 
 /*
@@ -324,39 +439,45 @@ export type Game<
  *
  * When developing a game, use `Game` instead.
  */
-export type Game_<GS extends GameStateBase, BMT extends BMTBase> = Omit<
-  Game<GS, BMT>,
-  "stats"
-> & {
-  stats?: {
-    allIds: string[];
-    // Note that we don't have any flags for stats yet, hence the `EmptyObject`.
-    byId: Record<string, EmptyObject>;
-  };
+export type Game_<
+  GS extends GameStateBase,
+  PMT extends MoveTypesBase = MoveTypesBase,
+  BMT extends MoveTypesBase = MoveTypesBase,
+> = Omit<Game<GS, PMT, BMT>, "playerStats" | "matchStats"> & {
+  playerStats?: Stats_;
+  matchStats?: Stats_;
 };
+
+function normalizeArray<T extends Record<string, any>, K extends keyof T>(
+  arr: T[],
+  key: K,
+): { allIds: T[K][]; byId: Record<T[K], T> } {
+  const allIds = arr.map((item) => item[key]);
+  const byId = Object.fromEntries(arr.map((item) => [item[key], item]));
+  return { allIds, byId };
+}
 
 /*
  * Parse a @lefun/game game definition into our internal game definition.
  */
-export function parseGame<GS extends GameStateBase, BMT extends BMTBase>(
-  game: Game<GS, BMT>,
-): Game_<GS, BMT> {
+export function parseGame<
+  GS extends GameStateBase,
+  PMT extends MoveTypesBase,
+  BMT extends MoveTypesBase,
+>(game: Game<GS, PMT, BMT>): Game_<GS, PMT, BMT> {
   // Normalize the stats.
-  const { stats: stats_ } = game;
 
-  const stats: Game_<GS, BMT>["stats"] = {
-    allIds: [],
-    byId: {},
-  };
+  const playerStats =
+    game.playerStats === undefined
+      ? undefined
+      : normalizeArray(game.playerStats, "key");
 
-  if (stats_) {
-    for (const { key } of stats_) {
-      stats.allIds.push(key);
-      stats.byId[key] = {};
-    }
-  }
+  const matchStats =
+    game.matchStats === undefined
+      ? undefined
+      : normalizeArray(game.matchStats, "key");
 
-  return { ...game, stats };
+  return { ...game, playerStats, matchStats };
 }
 
 // Game Manifest

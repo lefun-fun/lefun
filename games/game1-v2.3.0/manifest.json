@@ -1,0 +1,8 @@
+{
+  "id": "roll",
+  "packages": {
+    "game": "game",
+    "ui": "ui"
+  },
+  "version": "1"
+}

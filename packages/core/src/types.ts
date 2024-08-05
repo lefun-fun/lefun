@@ -107,10 +107,21 @@ export type GamePlayerSetting = {
 // "gamePlayerSettings" that we store.
 export type GamePlayerSettings = Record<string, GamePlayerSetting>;
 
-export type GameStat = {
-  key: string;
+export type GameStatType = "integer" | "rank" | "seconds";
+
+export type GameStat<K extends string = string> = {
+  key: K;
+  type?: GameStatType;
+
+  // TODO Define this and use in `getRanks`.
+  // direction: "lowerIsBetter" | "higherIsBetter";
+
+  // Primary stats are shown in the End Match box.
+  // They are also used to calculate the rank.
+  primary?: boolean;
 };
-export type GameStats = GameStat[];
+
+// export type GameStats = GameStat[];
 
 export type Credits = {
   design?: string[];

@@ -107,6 +107,7 @@ class Match extends EventTarget {
         random,
         areBots,
         locale,
+        ts: new Date().getTime(),
       });
 
       const { board, secretboard = {} } = initialBoards;

@@ -1,5 +1,5 @@
-import { getRanks } from "./scores";
-import { Locale, Scores, ScoreType, UserId } from "./types";
+// import { getRanks } from "./scores";
+import { Locale, UserId } from "./types";
 
 export interface Players {
   // List of all the player ids for the match.
@@ -15,12 +15,41 @@ export type MatchPlayersSettings = Record<UserId, MatchPlayerSettings>;
 
 export type MatchSettings = Record<string, string>;
 
+/*
 export type EndMatchOptions = {
   // When there is one score for the whole match.
   score?: number;
   // For cases where there is one score per player.
   scores?: Scores;
 };
+*/
+// RENDU ICI dans le fond faut penser à c'est quoi les scores possibles
+// et est-ce qu'on remplace ca par des stats, et si oui comment on 
+// montre
+//  * le score final dans le rematch box - on peut juste noter le key qqpart et c'est comme avant?
+//    * mais c'est pas tjrs aussi simple - on veut "timeout"/"temps ecoulé"
+//      * entre temps on peut avoir points - NAN et mettre un "-" quand la stat est pas la
+//      * au pire un <iframe> dans ces cas la!, mais par defaut autre chose
+//  * les stats du rank qu`on a en ce moment
+//  * Un jour un ELO score cohérent d'un jeu à l'autre
+//
+//  pe on remplace tout ca par un tableau de stats + les ranks
+//  penser a differents cas de figure (commencer par nos jeux)
+//
+//
+//  DONC BLOCO
+//  stats:
+//    points: integer (number / null if timed out, null=worse always, null equals to null)
+//    timedout: integer (0/1)
+//    timedout_order: 0, 1, 2 (higherIsBetter. en order de timeout)
+//    rank: points, timedout_order
+//
+//    rank: rank
+//  endMatchStat: [ points (auto rank)]
+//  copy-paste [ points (rank too)]
+//
+//
+//
 
 /*
  * Player info that is common to all games. A Player is a User in a Match.
@@ -74,14 +103,6 @@ export type Meta = {
   // For some games we use this locale to determine which locale to use in the match.
   // Optional only for backward compatibility: older matches won't have this field.
   locale?: Locale;
-};
-
-export type ItsYourTurnPayload = {
-  // Start the turn of these users. (defaults to []).
-  userIds?: UserId[] | "all";
-  // End the turn of these users (defaults to 'all' IF `userIds` is defined; when both
-  // `userIds` and `overUserIds` are undefined, we don't change the turns.).
-  overUserIds?: UserId[] | "all";
 };
 
 export const metaInitialState = ({
@@ -163,7 +184,6 @@ export const metaRemoveUserFromMatch = (meta: Meta, userId: UserId): void => {
 };
 
 /* Update `meta` inplace at the end of a match.
- */
 export const metaMatchEnded = (
   meta: Meta,
   endMatchOptions: EndMatchOptions,
@@ -197,56 +217,31 @@ export const metaMatchEnded = (
     });
   }
 };
+ */
 
-const setPlayerTurn = (meta: Meta, userId: UserId, value: boolean) => {
-  const player = meta.players.byId[userId];
-  if (!player) {
-    console.warn(
-      `Trying to set itsYourTurn for user ${userId} who is not in "meta"`,
-    );
-    return;
-  }
-  player.itsYourTurn = value;
-};
-
-export const metaItsYourTurn = (
-  meta: Meta,
-  itsYourTurn: ItsYourTurnPayload,
-): void => {
-  let { userIds, overUserIds } = itsYourTurn;
-
-  // Deal with default values.
-  if (userIds === undefined && overUserIds === undefined) {
-    // Nothing to do if neither `userIds` nor `overUserIds` is defined.
-    return;
-  }
-
-  // At this point at least one of `userIds` and `overUserIds` is defined.
-
-  if (userIds === undefined) {
-    // If only `overUserIds` is defined, we don't start the turn of any player.
-    userIds = [];
-  }
-
-  if (overUserIds === undefined) {
-    // If only `userIds` is defined, we end everyone's else's turns.
-    overUserIds = "all";
-  }
-
-  // End turns.
-  if (overUserIds === "all") {
-    overUserIds = meta.players.allIds;
-  }
-
-  for (const userId of overUserIds) {
-    setPlayerTurn(meta, userId, false);
-  }
-
-  // Start turns.
+export const metaSetTurns = ({
+  meta,
+  userIds,
+  value,
+}: {
+  meta: Meta;
+  userIds: UserId | UserId[] | "all";
+  value: boolean;
+}): void => {
   if (userIds === "all") {
     userIds = meta.players.allIds;
+  } else if (!Array.isArray(userIds)) {
+    userIds = [userIds];
   }
+
   for (const userId of userIds) {
-    setPlayerTurn(meta, userId, true);
+    const player = meta.players.byId[userId];
+    if (!player) {
+      console.warn(
+        `Trying to set itsYourTurn for user ${userId} who is not in "meta"`,
+      );
+      continue;
+    }
+    player.itsYourTurn = value;
   }
 };

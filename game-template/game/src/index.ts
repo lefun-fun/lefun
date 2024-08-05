@@ -22,7 +22,7 @@ export type Board = {
 export type RollGameState = GameState<Board>;
 
 type BMT = {
-  someBoardMove: never;
+  someBoardMove: null;
   someBoardMoveWithArgs: { someArg: number };
 };
 
@@ -32,7 +32,7 @@ const moveWithArg: PlayerMove<RollGameState, { someArg: string }, BMT> = {
   },
 };
 
-const roll: PlayerMove<RollGameState, never, BMT> = {
+const roll: PlayerMove<RollGameState, null, BMT> = {
   executeNow({ board, userId }) {
     board.players[userId].isRolling = true;
   },
@@ -44,13 +44,13 @@ const roll: PlayerMove<RollGameState, never, BMT> = {
   },
 };
 
-const initMove: BoardMove<RollGameState, never, BMT> = {
+const initMove: BoardMove<RollGameState, null, BMT> = {
   execute() {
     //
   },
 };
 
-const someBoardMove: BoardMove<RollGameState, never, BMT> = {
+const someBoardMove: BoardMove<RollGameState, null, BMT> = {
   execute() {
     //
   },
@@ -67,6 +67,7 @@ const someBoardMoveWithArgs: BoardMove<
 };
 
 export const game = {
+  version: '2.3.0',
   initialBoards: ({ players }) => ({
     board: {
       count: 0,
