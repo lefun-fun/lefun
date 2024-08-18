@@ -1,6 +1,6 @@
 {
   "name": "@lefun/core",
-  "version": "2.2.0",
+  "version": "2.3.0-alpha.0",
   "description": "Core library to make games for https://lefun.fun",
   "author": "Simon Lemieux",
   "repository": {
