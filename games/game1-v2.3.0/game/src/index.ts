@@ -1,4 +1,4 @@
-import { UserId } from "@lefun/core";
+import { GamePlayerSettings, GameSettings, UserId } from "@lefun/core";
 import {
   AutoMove,
   BoardMove,
@@ -21,9 +21,12 @@ export type Board = {
 
   sum: number;
   lastSomeBoardMoveValue?: number;
+
+  matchSettings: Record<string, string>;
+  matchPlayersSettings: Record<UserId, Record<string, string>>;
 };
 
-export type RollGameState = GameState<Board>;
+export type GS = GameState<Board>;
 
 type MoveWithArgPayload = { someArg: string };
 type BoardMoveWithArgPayload = { someArg: number };
@@ -47,7 +50,7 @@ const playerStats = [
 ] as const satisfies GameStats;
 
 type PM<Payload = null> = PlayerMove<
-  RollGameState,
+  GS,
   Payload,
   PMT,
   BMT,
@@ -71,7 +74,10 @@ const roll: PM = {
     logPlayerStat,
     endMatch,
   }) {
-    const diceValue = random.d6();
+    const diceValue =
+      board.matchPlayersSettings[userId].dieNumFaces === "6"
+        ? random.d6()
+        : random.dice(20);
     board.players[userId].diceValue = diceValue;
     board.players[userId].isRolling = false;
     board.sum += diceValue;
@@ -102,7 +108,7 @@ const roll: PM = {
   },
 };
 
-type BM<P = null> = BoardMove<RollGameState, P, PMT, BMT>;
+type BM<P = null> = BoardMove<GS, P, PMT, BMT>;
 
 const initMove: BM = {
   execute({ board, turns }) {
@@ -122,8 +128,41 @@ const someBoardMoveWithArgs: BM<BoardMoveWithArgPayload> = {
   },
 };
 
+const gameSettings: GameSettings = [
+  {
+    key: "setting1",
+    options: [{ value: "a" }, { value: "b" }],
+  },
+  { key: "setting2", options: [{ value: "x" }, { value: "y" }] },
+];
+
+const gamePlayerSettings: GamePlayerSettings = [
+  {
+    key: "color",
+    type: "color",
+    exclusive: true,
+    options: [
+      { value: "red", label: "red" },
+      { value: "blue", label: "blue" },
+      { value: "green", label: "green" },
+      { value: "orange", label: "orange" },
+      { value: "pink", label: "pink" },
+      { value: "brown", label: "brown" },
+      { value: "black", label: "black" },
+      { value: "darkgreen", label: "darkgreen" },
+      { value: "darkred", label: "darkred" },
+      { value: "purple", label: "purple" },
+    ],
+  },
+  {
+    key: "dieNumFaces",
+    type: "string",
+    options: [{ value: "6" }, { value: "20" }],
+  },
+];
+
 export const game = {
-  initialBoards({ players }) {
+  initialBoards({ players, matchSettings, matchPlayersSettings }) {
     return {
       board: {
         sum: 0,
@@ -132,6 +171,8 @@ export const game = {
         ),
         playerOrder: [...players],
         currentPlayerIndex: 0,
+        matchSettings,
+        matchPlayersSettings,
       },
     };
   },
@@ -141,11 +182,13 @@ export const game = {
   maxPlayers: 10,
   matchStats,
   playerStats,
-} satisfies Game<RollGameState, PMT, BMT>;
+  gameSettings,
+  gamePlayerSettings,
+} satisfies Game<GS, PMT, BMT>;
 
-export type RollGame = typeof game;
+export type G = typeof game;
 
-export const autoMove: AutoMove<RollGameState, RollGame> = ({ random }) => {
+export const autoMove: AutoMove<GS, G> = ({ random }) => {
   if (random.d2() === 1) {
     return ["moveWithArg", { someArg: "123" }];
   }

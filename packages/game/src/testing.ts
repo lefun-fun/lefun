@@ -219,7 +219,7 @@ export class MatchTester<
         let thereWasADefault = false;
         for (const option of options) {
           // If we find one, we use that one.
-          if (option.default) {
+          if (option.isDefault) {
             matchSettings[key] = option.value;
             thereWasADefault = true;
           }

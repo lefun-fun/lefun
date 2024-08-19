@@ -16,7 +16,7 @@ export const LOCALES: Locale[] = ["fr", "en"];
 export type GameSettingOption = {
   value: string;
   // Is it the default option. If it's missing we'll take the first one.
-  default?: boolean;
+  isDefault?: boolean;
 
   // Keeping as optional for backward compatibility.
   label?: string;
@@ -51,6 +51,11 @@ export type GameSetting = {
 
 export type GameSettings = GameSetting[];
 
+export type GameSettings_ = {
+  allIds: string[];
+  byId: Record<string, GameSetting>;
+};
+
 /*
  * Fields common to all the player setting options.
  */
@@ -58,7 +63,7 @@ export type CommonPlayerSettingOption = {
   value: string;
   // Is it the default option? If none is the default, we will fallback on the first
   // player option as the default.
-  default?: boolean;
+  isDefault?: boolean;
 };
 
 type ColorPlayerSettingOption = {
@@ -75,6 +80,7 @@ type StringPlayerSettingOption = {
 // Note that some fields are common to all types of game player setting, and some
 // depend on the type.
 export type GamePlayerSetting = {
+  key: string;
   // Can different players have the same selected option?
   // By default we assume *not* exclusive.
   exclusive?: boolean;
@@ -94,15 +100,12 @@ export type GamePlayerSetting = {
   | { type: "string"; options: StringPlayerSettingOption[] }
 );
 
-// FIXME This should be a list, to get an order, like the game options. This will be a problem when we have
-// more than one option (which is not the case yet!).
-// But at the same time being able to query the option using a string is useful, and
-// it's missing in the Game Options. Ideally find a way to have the best of both worlds,
-// for both the (regular) options and the player options... without making it to
-// cumbersome for the game developer! We probably want to internally build a allIds/byId
-// scheme from the list of options, and split the "game player options DEF" with the
-// "gamePlayerSettings" that we store.
-export type GamePlayerSettings = Record<string, GamePlayerSetting>;
+export type GamePlayerSettings = GamePlayerSetting[];
+
+export type GamePlayerSettings_ = {
+  allIds: string[];
+  byId: Record<string, GamePlayerSetting>;
+};
 
 export type GameStatType =
   | "integer"

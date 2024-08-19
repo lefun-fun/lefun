@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 
 import { MatchTester as _MatchTester, MatchTesterOptions } from "@lefun/game";
 
-import { autoMove, game, RollGame as G, RollGameState as GS } from ".";
+import { autoMove, G, game, GS } from ".";
 
 class MatchTester extends _MatchTester<GS, G> {
   constructor(options: Omit<MatchTesterOptions<GS, G>, "game" | "autoMove">) {

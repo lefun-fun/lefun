@@ -12,22 +12,23 @@ import {
   useUsername,
 } from "@lefun/ui";
 
-import type { RollGame, RollGameState } from "game1-v2.3.0-game";
+import type { G, GS } from "game1-v2.3.0-game";
 
-// Dice symbol characters
-const DICE = ["", "\u2680", "\u2681", "\u2682", "\u2683", "\u2684", "\u2685"];
-
-const useSelector = makeUseSelector<RollGameState>();
-const useSelectorShallow = makeUseSelectorShallow<RollGameState>();
-const useMakeMove = makeUseMakeMove<RollGame>();
+const useSelector = makeUseSelector<GS>();
+const useSelectorShallow = makeUseSelectorShallow<GS>();
+const useMakeMove = makeUseMakeMove<G>();
 
 function Player({ userId }: { userId: UserId }) {
   const itsMe = useSelector((state) => state.userId === userId);
   const username = useUsername(userId);
 
+  const color = useSelector(
+    (state) => state.board.matchPlayersSettings[userId].color,
+  );
+
   return (
     <div className="player">
-      <span className={classNames(itsMe && "bold")}>{username}</span>
+      <span className={classNames(itsMe && "bold", color)}>{username}</span>
       <Die userId={userId} />
     </div>
   );
@@ -42,9 +43,10 @@ function Die({ userId }: { userId: UserId }) {
   );
 
   return (
-    <span className="dice">
-      {isRolling || !diceValue ? "?" : DICE[diceValue]}
-    </span>
+    <div>
+      Dice Value:{" "}
+      <span className="dice">{isRolling || !diceValue ? "?" : diceValue}</span>
+    </div>
   );
 }
 
@@ -54,12 +56,19 @@ function Board() {
     Object.keys(state.board.players),
   );
 
+  const matchSettings = useSelector((state) => state.board.matchSettings);
+
   const isPlayer = useIsPlayer();
 
   return (
     <div>
       <div>
         <Trans>The template game</Trans>
+        {Object.entries(matchSettings).map(([key, value]) => (
+          <div key={key}>
+            <span className="bold">{key}:</span> {value}
+          </div>
+        ))}
         {players.map((userId) => (
           <Player key={userId} userId={userId} />
         ))}

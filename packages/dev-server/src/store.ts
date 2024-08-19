@@ -6,6 +6,7 @@ import { createContext, useContext } from "react";
 import { createStore as _createStore, useStore as _useStore } from "zustand";
 
 import type { Locale, UserId } from "@lefun/core";
+import { Game_ } from "@lefun/game";
 
 import type { Match } from "./match";
 
@@ -30,14 +31,21 @@ type State = {
   locale: Locale;
   locales: Locale[];
   view: View;
+  game: Game_;
+  match: Match | undefined;
+  //
   toggleShowDimensions: () => void;
   toggleCollapsed: () => void;
   setLayout: (layout: Layout) => void;
   setLocale: (locale: Locale) => void;
   setVisibleUserId: (userId: UserId | "all" | "spectator") => void;
   setView: (view: View) => void;
-  resetMatch: (arg0: { locale: Locale; numPlayers?: number }) => void;
-  match: Match | undefined;
+  resetMatch: (arg0?: {
+    locale?: Locale;
+    numPlayers?: number;
+    matchSettings?: any;
+    matchPlayersSettings?: any;
+  }) => void;
 };
 
 function saveToLocalStorage(state: Partial<State>): void {
@@ -54,7 +62,7 @@ function loadFromLocalStorage(store: ReturnType<typeof createStore>) {
   store.setState(obj);
 }
 
-function createStore({ locales }: { locales: Locale[] }) {
+function createStore({ locales, game }: { locales: Locale[]; game: Game_ }) {
   const store = _createStore<State>()((set) => ({
     collapsed: false,
     layout: "row",
@@ -64,6 +72,7 @@ function createStore({ locales }: { locales: Locale[] }) {
     locales,
     view: "game",
     match: undefined,
+    game,
     resetMatch: () => {
       //
     },

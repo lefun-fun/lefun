@@ -8,7 +8,7 @@ import {
   User,
   UserId,
 } from "@lefun/core";
-import { Game, GameStateBase, MoveSideEffects, Random } from "@lefun/game";
+import { Game_, MoveSideEffects, Random } from "@lefun/game";
 
 type State = {
   board: unknown;
@@ -16,20 +16,27 @@ type State = {
   secretboard: unknown;
 };
 
-type G = Game<GameStateBase, any>;
-
 // We increment this every time we make backward incompatible changes in the match
 // saved to local storage. We save this version with the match to later detect that
 // a saved match is too old.
-const VERSION = 1;
+const VERSION = 2;
 
 class Match extends EventTarget {
   random: Random;
-  game: G;
+  game: Game_;
+  // These will be serialized with the Match.
   players: Record<UserId, User>;
   matchData: unknown;
   gameData: unknown;
-  gameId?: string;
+  matchSettings: MatchSettings;
+  matchPlayersSettings: MatchPlayersSettings;
+  // Locale at the time of creating the match. This is not necessarily the same as the
+  // current selected locale.
+  locale: Locale;
+
+  get numPlayers() {
+    return Object.keys(this.players).length;
+  }
 
   // Store that represents the backend.
   // We need to put it in a zustand Store because we want the JSON view in the right
@@ -43,19 +50,17 @@ class Match extends EventTarget {
     matchPlayersSettings,
     matchData,
     gameData,
-    gameId,
     locale,
     //
     state,
   }: {
-    game: G;
+    game: Game_;
     players: Record<UserId, User>;
-    matchSettings?: MatchSettings;
-    matchPlayersSettings?: MatchPlayersSettings;
-    matchData?: unknown;
-    gameData?: unknown;
-    gameId?: string;
-    locale?: Locale;
+    matchSettings: MatchSettings;
+    matchPlayersSettings: MatchPlayersSettings;
+    matchData: unknown;
+    gameData: unknown;
+    locale: Locale;
     //
     state?: State;
   }) {
@@ -63,33 +68,17 @@ class Match extends EventTarget {
 
     const random = new Random();
     this.random = random;
-
     this.game = game;
     this.players = players;
     this.matchData = matchData;
     this.gameData = gameData;
-    this.gameId = gameId;
+    this.matchSettings = matchSettings;
+    this.matchPlayersSettings = matchPlayersSettings;
+    this.locale = locale;
 
     if (state) {
       this.store = createStore(() => state as State);
     } else {
-      // If no saved `state was provided, we need to create everything from scratch.
-      if (!matchSettings) {
-        throw new Error("match settings required");
-      }
-
-      if (!matchPlayersSettings) {
-        throw new Error("match players settings required");
-      }
-
-      if (!locale) {
-        throw new Error("locale required");
-      }
-
-      if (!players) {
-        throw new Error("players required");
-      }
-
       const areBots = Object.fromEntries(
         Object.entries(players).map(([userId, { isBot }]) => [userId, !!isBot]),
       );
@@ -212,7 +201,7 @@ class Match extends EventTarget {
     }
 
     if (execute) {
-      const { store, random, matchData, gameData } = this;
+      const { matchData, gameData, random, store } = this;
       store.setState((state: State) => {
         const [newState, patches] = produceWithPatches(
           state,
@@ -262,27 +251,53 @@ class Match extends EventTarget {
 
   serialize(): string {
     const state = this.store.getState();
-    const { players, matchData, gameData, gameId } = this;
+    const {
+      players,
+      matchData,
+      gameData,
+      matchSettings,
+      matchPlayersSettings,
+    } = this;
     return JSON.stringify({
       state,
       players,
       matchData,
       gameData,
-      gameId,
+      // gameId,
+      matchSettings,
+      matchPlayersSettings,
       version: VERSION,
     });
   }
 
-  static deserialize(str: string, game: Game<any, any>): Match {
+  static deserialize(str: string, game: Game_): Match {
     const obj = JSON.parse(str);
-    const { state, players, matchData, gameData, gameId, version } = obj;
+    const {
+      state,
+      players,
+      matchData,
+      gameData,
+      matchSettings,
+      matchPlayersSettings,
+      locale,
+      version,
+    } = obj;
 
     // Currently we don't even try to maintain backward compatiblity here.
     if (version !== VERSION) {
       throw new Error(`unsupported version ${version}`);
     }
 
-    return new Match({ state, players, matchData, gameData, game, gameId });
+    return new Match({
+      state,
+      players,
+      matchData,
+      gameData,
+      game,
+      matchSettings,
+      matchPlayersSettings,
+      locale,
+    });
   }
 }
 
@@ -330,10 +345,7 @@ function saveMatchToLocalStorage(match: Match, gameId?: string) {
   localStorage.setItem(matchKey(gameId), match.serialize());
 }
 
-function loadMatchFromLocalStorage(
-  game: Game<any, any>,
-  gameId?: string,
-): Match | null {
+function loadMatchFromLocalStorage(game: Game_, gameId?: string): Match | null {
   const str = localStorage.getItem(matchKey(gameId));
 
   if (!str) {

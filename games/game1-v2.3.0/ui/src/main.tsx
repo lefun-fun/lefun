@@ -16,5 +16,5 @@ render({
   },
   game,
   messages: { en, fr },
-  gameId: "roll",
+  gameId: "game1-v2.3.0",
 });

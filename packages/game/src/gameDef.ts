@@ -2,7 +2,9 @@ import {
   AkaType,
   Credits,
   GamePlayerSettings,
+  GamePlayerSettings_,
   GameSettings,
+  GameSettings_,
   GameStat,
   GameStats_,
   IfAny,
@@ -92,16 +94,18 @@ type StatsKeys<S extends GameStats> = S extends { key: infer K }[] ? K : never;
 
 export type EndMatch = () => void;
 
-export type LogPlayerStat<PS extends GameStats> = (
+export type LogPlayerStat<PS extends GameStats = GameStats> = (
   userId: UserId,
   key: StatsKeys<PS>,
   value: number,
 ) => void;
 
-export type LogMatchStat<MS extends GameStats> = (
+export type LogMatchStat<MS extends GameStats = GameStats> = (
   key: StatsKeys<MS>,
   value: number,
 ) => void;
+
+export type Reward = (options: RewardPayload) => void;
 
 export type MoveSideEffects<
   PMT extends MoveTypesBase = MoveTypesBase,
@@ -112,7 +116,7 @@ export type MoveSideEffects<
   delayMove: DelayMove<BMT>;
   turns: Turns<PMT, BMT>;
   endMatch: EndMatch;
-  reward?: (options: RewardPayload) => void;
+  reward?: Reward;
   logPlayerStat: LogPlayerStat<PS>;
   logMatchStat: LogMatchStat<MS>;
 };
@@ -421,15 +425,23 @@ export type Game_<
   GS extends GameStateBase = GameStateBase,
   PMT extends MoveTypesBase = MoveTypesBase,
   BMT extends MoveTypesBase = MoveTypesBase,
-> = Omit<Game<GS, PMT, BMT>, "playerStats" | "matchStats"> & {
+> = Omit<
+  Game<GS, PMT, BMT>,
+  "playerStats" | "matchStats" | "gameSettings" | "gamePlayerSettings"
+> & {
   playerStats?: GameStats_;
   matchStats?: GameStats_;
+  gameSettings?: GameSettings_;
+  gamePlayerSettings?: GamePlayerSettings_;
 };
 
 function normalizeArray<T extends Record<string, any>, K extends keyof T>(
-  arr: T[],
+  arr: T[] | undefined,
   key: K,
 ): { allIds: T[K][]; byId: Record<T[K], T> } {
+  if (arr === undefined) {
+    return { allIds: [], byId: {} as Record<T[K], T> };
+  }
   const allIds = arr.map((item) => item[key]);
   const byId = Object.fromEntries(arr.map((item) => [item[key], item]));
   return { allIds, byId };
@@ -477,8 +489,10 @@ export function parseGame<
 >(game: Game<GS, PMT, BMT>): Game_<GS, PMT, BMT> {
   const playerStats = normalizeStats(game.playerStats);
   const matchStats = normalizeStats(game.matchStats);
+  const gameSettings = normalizeArray(game.gameSettings, "key");
+  const gamePlayerSettings = normalizeArray(game.gamePlayerSettings, "key");
 
-  return { ...game, playerStats, matchStats };
+  return { ...game, playerStats, matchStats, gameSettings, gamePlayerSettings };
 }
 
 // Game Manifest

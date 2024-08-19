@@ -10,8 +10,16 @@ import { ReactNode, RefObject, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createStore as _createStore } from "zustand";
 
-import type { Locale, MatchSettings, UserId, UsersState } from "@lefun/core";
-import { Game, MoveSideEffects } from "@lefun/game";
+import type {
+  GameId,
+  GameSetting,
+  Locale,
+  MatchPlayersSettings,
+  MatchSettings,
+  UserId,
+  UsersState,
+} from "@lefun/core";
+import { Game, Game_, MoveSideEffects, parseGame } from "@lefun/game";
 import { setMakeMove, Store, storeContext } from "@lefun/ui";
 
 import {
@@ -38,12 +46,14 @@ const BoardForPlayer = ({
   userId,
   messages,
   locale,
+  gameId,
 }: {
   board: any;
   match: Match;
   userId: UserId | "spectator";
   messages: Record<string, string>;
   locale: Locale;
+  gameId: GameId;
 }) => {
   useEffect(() => {
     i18n.loadAndActivate({ locale, messages });
@@ -155,12 +165,12 @@ const BoardForPlayer = ({
       }
 
       match.makeMove(userId, moveName, payload);
-      saveMatchToLocalStorage(match, match.gameId);
+      saveMatchToLocalStorage(match, gameId);
     });
 
     storeRef.current = store;
     setLoading(false);
-  }, [userId, match]);
+  }, [userId, match, gameId]);
 
   if (loading) {
     return <div>Loading player...</div>;
@@ -256,6 +266,172 @@ function MatchStateView() {
   );
 }
 
+function MatchSetting({
+  matchValue,
+  gameSetting,
+}: {
+  matchValue: string;
+  gameSetting: GameSetting;
+}) {
+  const resetMatch = useStore((state) => state.resetMatch);
+  const matchSettings = useStore((state) => state.match?.matchSettings);
+
+  if (!matchSettings) {
+    return null;
+  }
+
+  const { key, options } = gameSetting;
+  return (
+    <div>
+      <label className="text-sm font-medium text-neutral-700">{key}</label>
+      <select
+        className="border border-black w-full"
+        value={matchValue}
+        onChange={(e) => {
+          resetMatch({
+            matchSettings: { ...matchSettings, [key]: e.target.value },
+          });
+        }}
+      >
+        {options.map(({ value }) => (
+          <option key={value} value={value}>
+            {value}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function SettingsSection({ children }: { children: ReactNode }) {
+  return (
+    <div className="w-full px-1 overflow-hidden ">
+      <div className="rounded-lg bg-neutral-200 p-2 space-y-2 max-h-72 overflow-y-auto w-full">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function MatchSettingsView() {
+  const game = useStore((state) => state.game);
+  const matchSettings = useStore((state) => state.match?.matchSettings);
+
+  const { gameSettings } = game;
+
+  if (!gameSettings || !matchSettings) {
+    return null;
+  }
+
+  return (
+    <SettingsSection>
+      {gameSettings.allIds.map((key) => (
+        <MatchSetting
+          key={key}
+          gameSetting={gameSettings.byId[key]}
+          matchValue={matchSettings[key]}
+        />
+      ))}
+    </SettingsSection>
+  );
+}
+
+function MatchPlayerSetting({
+  userId,
+  gameSetting,
+  matchValue,
+}: {
+  userId: UserId;
+  gameSetting: GameSetting;
+  matchValue: string;
+}) {
+  const resetMatch = useStore((state) => state.resetMatch);
+  const matchPlayersSettings = useStore(
+    (state) => state.match?.matchPlayersSettings,
+  );
+
+  if (!matchPlayersSettings) {
+    return null;
+  }
+
+  const { key, options } = gameSetting;
+  return (
+    <div>
+      <label className="text-sm font-medium text-neutral-700">{key}</label>
+      <select
+        className="border border-black w-full"
+        value={matchValue}
+        onChange={(e) => {
+          resetMatch({
+            matchPlayersSettings: {
+              ...matchPlayersSettings,
+              [userId]: {
+                ...matchPlayersSettings[userId],
+                [key]: e.target.value,
+              },
+            },
+          });
+        }}
+      >
+        {options.map(({ value }) => (
+          <option key={value} value={value}>
+            {value}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+function MatchPlayerSettings({ userId }: { userId: UserId }) {
+  const game = useStore((state) => state.game);
+  const { gamePlayerSettings } = game;
+  const matchPlayersSettings = useStore(
+    (state) => state.match?.matchPlayersSettings,
+  );
+
+  const username = useStore((state) => state.match?.players[userId]?.username);
+
+  if (!gamePlayerSettings || !matchPlayersSettings) {
+    return null;
+  }
+
+  return (
+    <div className="w-full">
+      <label className="text-black font-semibold text-center w-full">
+        {username}
+      </label>
+      {gamePlayerSettings.allIds.map((key) => (
+        <MatchPlayerSetting
+          key={key}
+          userId={userId}
+          gameSetting={gamePlayerSettings.byId[key]}
+          matchValue={matchPlayersSettings[userId][key]}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PlayerSettingsView() {
+  const match = useStore((state) => state.match);
+  if (!match) {
+    return null;
+  }
+  const { players } = match;
+
+  const userIds = Object.keys(players);
+
+  return (
+    <SettingsSection>
+      <div className="flex flex-col space-y-4">
+        {userIds.map((userId) => (
+          <MatchPlayerSettings key={userId} userId={userId} />
+        ))}
+      </div>
+    </SettingsSection>
+  );
+}
+
 const Button = ({
   onClick,
   children,
@@ -295,12 +471,11 @@ function capitalize(s: string): string {
   return s && s[0].toUpperCase() + s.slice(1);
 }
 
-function Settings() {
+function SettingsButtons() {
   const setLayout = useStore((state) => state.setLayout);
   const toggleCollapsed = useStore((state) => state.toggleCollapsed);
   const toggleShowDimensions = useStore((state) => state.toggleShowDimensions);
   const layout = useStore((state) => state.layout);
-  const collapsed = useStore((state) => state.collapsed);
   const locales = useStore((state) => state.locales);
   const locale = useStore((state) => state.locale);
   const setLocale = useStore((state) => state.setLocale);
@@ -316,10 +491,109 @@ function Settings() {
     return null;
   }
 
-  const { players } = match;
-
+  const { players, numPlayers } = match;
   const userIds = Object.keys(players);
-  const numPlayers = userIds.length;
+
+  return (
+    <div className="flex flex-col gap-1 items-start justify-start">
+      <ButtonRow>
+        <Button onClick={toggleCollapsed}>▶</Button>
+      </ButtonRow>
+      <ButtonRow>
+        {(["game", "rules"] as const).map((v) => (
+          <Button key={v} active={v === view} onClick={() => setView(v)}>
+            {capitalize(v)}
+          </Button>
+        ))}
+      </ButtonRow>
+      <ButtonRow>
+        <Button onClick={() => toggleShowDimensions()} active={showDim}>
+          ? x ?
+        </Button>
+        {locales.map((otherLocale) => (
+          <Button
+            key={otherLocale}
+            onClick={() => setLocale(otherLocale)}
+            active={otherLocale === locale}
+          >
+            {otherLocale}
+          </Button>
+        ))}
+      </ButtonRow>
+      {view === "game" && (
+        <>
+          <ButtonRow>
+            <Button
+              onClick={() => setVisibleUserId("spectator")}
+              active={visibleUserId === "spectator"}
+            >
+              Spec
+            </Button>
+            {userIds.map((userId) => (
+              <Button
+                key={userId}
+                onClick={() => setVisibleUserId(userId)}
+                active={visibleUserId === userId}
+              >
+                {userId}
+              </Button>
+            ))}
+            <Button
+              onClick={() => {
+                setVisibleUserId("all");
+                setLayout("row");
+              }}
+              active={visibleUserId === "all" && layout === "row"}
+            >
+              ||
+            </Button>
+            <Button
+              onClick={() => {
+                setVisibleUserId("all");
+                setLayout("column");
+              }}
+              active={visibleUserId === "all" && layout === "column"}
+            >
+              =
+            </Button>
+          </ButtonRow>
+          <ButtonRow>
+            <Button
+              onClick={() => {
+                resetMatch();
+              }}
+            >
+              Reset Game State
+            </Button>
+          </ButtonRow>
+          <ButtonRow>
+            <Button
+              onClick={() => {
+                resetMatch({ numPlayers: numPlayers + 1 });
+              }}
+              disabled={numPlayers >= match.game.maxPlayers}
+            >
+              Add Player
+            </Button>
+            <Button
+              onClick={() => {
+                resetMatch({ numPlayers: numPlayers - 1 });
+              }}
+              disabled={numPlayers <= match.game.minPlayers}
+            >
+              Remove Player
+            </Button>
+          </ButtonRow>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Settings() {
+  const toggleCollapsed = useStore((state) => state.toggleCollapsed);
+  const collapsed = useStore((state) => state.collapsed);
+  const view = useStore((state) => state.view);
 
   if (collapsed) {
     return (
@@ -332,102 +606,24 @@ function Settings() {
   return (
     <div
       className={classNames(
-        "flex w-1/4 min-w-60 flex flex-col overflow-y-auto",
+        "flex w-1/4 min-w-60 flex-col overflow-y-auto",
+        "space-y-2",
       )}
     >
-      <div className="flex flex-col gap-1 items-start justify-start">
-        <ButtonRow>
-          <Button onClick={toggleCollapsed}>▶</Button>
-        </ButtonRow>
-        <ButtonRow>
-          {(["game", "rules"] as const).map((v) => (
-            <Button key={v} active={v === view} onClick={() => setView(v)}>
-              {capitalize(v)}
-            </Button>
-          ))}
-        </ButtonRow>
-        <ButtonRow>
-          <Button onClick={() => toggleShowDimensions()} active={showDim}>
-            ? x ?
-          </Button>
-          {locales.map((otherLocale) => (
-            <Button
-              key={otherLocale}
-              onClick={() => setLocale(otherLocale)}
-              active={otherLocale === locale}
-            >
-              {otherLocale}
-            </Button>
-          ))}
-        </ButtonRow>
-        {view === "game" && (
-          <>
-            <ButtonRow>
-              <Button
-                onClick={() => setVisibleUserId("spectator")}
-                active={visibleUserId === "spectator"}
-              >
-                Spec
-              </Button>
-              {userIds.map((userId) => (
-                <Button
-                  key={userId}
-                  onClick={() => setVisibleUserId(userId)}
-                  active={visibleUserId === userId}
-                >
-                  {userId}
-                </Button>
-              ))}
-              <Button
-                onClick={() => {
-                  setVisibleUserId("all");
-                  setLayout("row");
-                }}
-                active={visibleUserId === "all" && layout === "row"}
-              >
-                ||
-              </Button>
-              <Button
-                onClick={() => {
-                  setVisibleUserId("all");
-                  setLayout("column");
-                }}
-                active={visibleUserId === "all" && layout === "column"}
-              >
-                =
-              </Button>
-            </ButtonRow>
-            <ButtonRow>
-              <Button
-                onClick={() => {
-                  resetMatch({ locale });
-                }}
-              >
-                Reset Game State
-              </Button>
-            </ButtonRow>
-            <ButtonRow>
-              <Button
-                onClick={() => {
-                  resetMatch({ numPlayers: numPlayers + 1, locale });
-                }}
-                disabled={numPlayers >= match.game.maxPlayers}
-              >
-                Add Player
-              </Button>
-              <Button
-                onClick={() => {
-                  resetMatch({ numPlayers: numPlayers - 1, locale });
-                }}
-                disabled={numPlayers <= match.game.minPlayers}
-              >
-                Remove Player
-              </Button>
-            </ButtonRow>
-          </>
-        )}
-      </div>
-      {view === "game" && <MatchStateView />}
+      <SettingsButtons />
+      {view === "game" && (
+        <>
+          <div className="max-h-60 overflow-y-auto">
+            <MatchSettingsView />
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            <PlayerSettingsView />
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <MatchStateView />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -563,59 +759,107 @@ const initMatch = ({
   game,
   matchData,
   gameData,
-  matchSettings,
   locale,
+  matchSettings,
+  matchPlayersSettings,
   numPlayers,
-  tryToLoadFromLocaleStorage = false,
-  gameId,
 }: {
-  game: Game<any, any>;
+  game: Game_;
   matchData: unknown;
   gameData: unknown;
-  matchSettings: MatchSettings;
-  locale: Locale;
-  numPlayers: number;
-  tryToLoadFromLocaleStorage?: boolean;
-  gameId?: string;
+  locale?: Locale;
+  matchSettings?: MatchSettings;
+  matchPlayersSettings?: MatchPlayersSettings;
+  numPlayers?: number;
 }) => {
-  let match: Match | null = null;
+  numPlayers ??= game.minPlayers;
+  locale ??= "en";
 
-  if (tryToLoadFromLocaleStorage) {
-    match = loadMatchFromLocalStorage(game, gameId);
+  const { gameSettings, gamePlayerSettings } = game;
+
+  if (!matchSettings) {
+    matchSettings = {};
+
+    if (gameSettings) {
+      matchSettings = Object.fromEntries(
+        gameSettings.allIds.map((key) => {
+          for (const { value, isDefault } of gameSettings.byId[key].options) {
+            if (isDefault) {
+              return [key, value];
+            }
+          }
+          return [key, gameSettings.byId[key].options[0].value];
+        }),
+      );
+    }
   }
 
-  if (match === null) {
-    const userIds = getUserIds(numPlayers);
+  const userIds = getUserIds(numPlayers);
 
-    const players = Object.fromEntries(
-      userIds.map((userId) => [
-        userId,
-        {
-          username: `Player ${userId}`,
-          isBot: false,
-          // TODO We don't need to know if they are guests in here.
-          isGuest: false,
-        },
-      ]),
-    );
+  if (!matchPlayersSettings) {
+    matchPlayersSettings = {};
+    if (gamePlayerSettings) {
+      matchPlayersSettings = Object.fromEntries(
+        userIds.map((userId) => [userId, {}]),
+      );
 
-    // A different color per player.
-    // TODO This is game specific!
-    const matchPlayersSettings = Object.fromEntries(
-      userIds.map((userId, i) => [userId, { color: i.toString() }]),
-    );
+      for (const key of gamePlayerSettings.allIds) {
+        const taken = new Set();
 
-    match = new Match({
-      game,
-      matchSettings,
-      matchPlayersSettings,
-      matchData,
-      gameData,
-      players,
-      locale,
-      gameId,
-    });
+        const { exclusive, options } = gamePlayerSettings.byId[key];
+
+        for (const userId of userIds) {
+          let found = false;
+          for (const { value, isDefault } of options) {
+            if (exclusive && !taken.has(value)) {
+              matchPlayersSettings[userId][key] = value;
+              taken.add(value);
+              found = true;
+              break;
+            }
+
+            if (isDefault && !exclusive) {
+              matchPlayersSettings[userId][key] = value;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            if (exclusive) {
+              throw new Error(
+                `Not enough options for exclusive player setting "${key}"`,
+              );
+            } else {
+              // Fallback on the first option.
+              matchPlayersSettings[userId][key] = options[0].value;
+            }
+          }
+        }
+      }
+    }
   }
+
+  const players = Object.fromEntries(
+    userIds.map((userId) => [
+      userId,
+      {
+        username: `Player ${userId}`,
+        isBot: false,
+        // TODO We don't need to know if they are guests in here.
+        isGuest: false,
+      },
+    ]),
+  );
+
+  const match = new Match({
+    game,
+    matchSettings,
+    matchPlayersSettings,
+    matchData,
+    gameData,
+    players,
+    locale,
+  });
 
   return match;
 };
@@ -624,28 +868,28 @@ async function render({
   game,
   board,
   rules,
-  matchSettings = {},
   matchData,
   gameData,
   idName = "home",
   messages = { en: {} },
-  gameId = undefined,
+  gameId = "unknown-game-id",
 }: {
-  game: Game<any, any>;
+  game: Game;
   board: () => Promise<ReactNode>;
   rules?: () => Promise<ReactNode>;
-  matchSettings?: MatchSettings;
   matchData?: any;
   gameData?: any;
   idName?: string;
   messages?: AllMessages;
-  gameId?: string;
+  gameId: string;
 }) {
   function renderComponent(content: ReactNode) {
     const container = document.getElementById(idName);
     const root = createRoot(container!);
     return root.render(content);
   }
+
+  const game_ = parseGame(game);
 
   const urlParams = new URLSearchParams(window.location.search);
   let locale = urlParams.get("l") as Locale;
@@ -674,6 +918,7 @@ async function render({
         userId={userId}
         messages={messages[locale]}
         locale={locale}
+        gameId={gameId}
       />
     );
 
@@ -687,6 +932,7 @@ async function render({
   const locales = (Object.keys(messages) || ["en"]) as Locale[];
   const store = createStore({
     locales,
+    game: game_,
   });
 
   // sanity check
@@ -697,30 +943,28 @@ async function render({
   locale = store.getState().locale;
 
   const resetMatch = ({
-    tryToLoadFromLocaleStorage = false,
     numPlayers,
     locale,
+    matchSettings,
+    matchPlayersSettings,
   }: {
-    tryToLoadFromLocaleStorage?: boolean;
     numPlayers?: number;
     locale?: Locale;
-  }) => {
-    {
-      const match = store.getState().match;
-      numPlayers ??=
-        Object.keys(match?.players || {}).length || game.minPlayers;
-    }
+    matchSettings?: MatchSettings;
+    matchPlayersSettings?: MatchPlayersSettings;
+  } = {}) => {
+    let match = store.getState().match;
 
-    locale ??= store.getState().locale;
-    const match = initMatch({
-      game,
+    match = initMatch({
+      game: game_,
       matchData,
       gameData,
-      matchSettings,
-      locale,
-      numPlayers,
-      tryToLoadFromLocaleStorage,
-      gameId,
+      locale: locale || match?.locale,
+      numPlayers: numPlayers || match?.numPlayers,
+      matchSettings: matchSettings || match?.matchSettings,
+      matchPlayersSettings:
+        matchPlayersSettings ||
+        (numPlayers === undefined ? match?.matchPlayersSettings : undefined),
     });
 
     // We use `window.lefun` to communicate between the host and the player boards.
@@ -731,13 +975,21 @@ async function render({
     store.setState(() => ({ match }));
   };
 
-  store.setState(() => ({ resetMatch }));
+  store.setState(() => ({ game: game_, resetMatch }));
 
-  resetMatch({
-    tryToLoadFromLocaleStorage: true,
-    locale,
-    numPlayers: game.minPlayers,
-  });
+  // Try to load the match from local storage, or create a new one.
+  {
+    let match = loadMatchFromLocalStorage(game_, gameId);
+    if (!match) {
+      match = initMatch({
+        game: game_,
+        matchData,
+        gameData,
+      });
+    }
+    store.setState(() => ({ match }));
+    (window as any).lefun = { match };
+  }
 
   // We import the CSS using the package name because this is what will be needed by packages importing this.
   // @ts-expect-error Make typescript happy.
