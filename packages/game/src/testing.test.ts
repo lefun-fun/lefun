@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 
+import { GamePlayerSettings } from "@lefun/core";
+
 import { BoardMove, Game, GameState, INIT_MOVE, PlayerMove } from ".";
 import { MatchTester } from "./testing";
 
@@ -227,4 +229,81 @@ describe("fastForward", () => {
     match.fastForward(5000);
     expect(match.board.timestamps).toEqual([0, 1000]);
   });
+});
+
+describe("game player settings", () => {
+  test("game player settings default settings are correct", () => {
+    type B = {
+      matchPlayersSettings: Record<string, Record<string, string>>;
+    };
+    type GS = GameState<B>;
+
+    const gamePlayerSettings: GamePlayerSettings = [
+      {
+        key: "color",
+        type: "color",
+        options: [
+          {
+            value: "red",
+            label: "red",
+          },
+          {
+            value: "blue",
+            label: "red",
+          },
+        ],
+        exclusive: true,
+      },
+    ];
+
+    const game = {
+      ...gameBase,
+      initialBoards: ({ matchPlayersSettings }) => ({
+        board: { matchPlayersSettings },
+      }),
+      playerMoves: {},
+      boardMoves: {},
+      gamePlayerSettings,
+    } satisfies Game<GS>;
+
+    const match = new MatchTester<GS, typeof game>({ game, numPlayers: 2 });
+
+    expect(match.matchPlayersSettings).toEqual({
+      "userId-0": {
+        color: "red",
+      },
+      "userId-1": {
+        color: "blue",
+      },
+    });
+  });
+});
+
+test("error in move does not get applied", () => {
+  type B = {
+    x: number;
+  };
+  type GS = GameState<B>;
+  const game = {
+    ...gameBase,
+    initialBoards: () => ({ board: { x: 0 } }),
+    playerMoves: {
+      incrementWithError: {
+        execute({ board }) {
+          board.x++;
+          throw new Error("error");
+        },
+      },
+    },
+  } satisfies Game<GS>;
+
+  const match = new MatchTester<GS, typeof game>({ game, numPlayers: 1 });
+
+  const userId = match.meta.players.allIds[0];
+
+  expect(() => {
+    match.makeMove(userId, "incrementWithError");
+  }).toThrowError("error");
+
+  expect(match.board.x).toBe(0);
 });

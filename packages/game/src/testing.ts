@@ -31,7 +31,7 @@ import {
   Turns,
 } from "./gameDef";
 import { Random } from "./random";
-import { parseMove, parseTurnUserIds } from "./utils";
+import { deepCopy, parseMove, parseTurnUserIds } from "./utils";
 
 type DelayedPlayerMove = {
   type: "playerMove";
@@ -232,24 +232,24 @@ export class MatchTester<
     }
 
     // Default matchPlayer options
-    if (!matchPlayersSettingsArr) {
+    const { gamePlayerSettings } = this.game;
+    if (!matchPlayersSettingsArr && gamePlayerSettings) {
       matchPlayersSettingsArr = [];
       // Loop through the users.
       for (let nthUser = 0; nthUser < meta.players.allIds.length; ++nthUser) {
         const opts: MatchPlayerSettings = {};
-        Object.entries(game.gamePlayerSettings || {}).forEach(
-          ([key, optionDef]) => {
-            if (optionDef.exclusive) {
-              // For each user, given them the n-th option. Loop if there are less options
-              // than players.
-              opts[key] =
-                optionDef.options[nthUser % optionDef.options.length].value;
-            } else {
-              // TODO We probably need a default option here!
-              opts[key] = optionDef.options[0].value;
-            }
-          },
-        );
+        gamePlayerSettings.allIds.forEach((key) => {
+          const optionDef = gamePlayerSettings.byId[key];
+          if (optionDef.exclusive) {
+            // For each user, given them the n-th option. Loop if there are less options
+            // than players.
+            opts[key] =
+              optionDef.options[nthUser % optionDef.options.length].value;
+          } else {
+            // TODO We probably need a default option here!
+            opts[key] = optionDef.options[0].value;
+          }
+        });
         matchPlayersSettingsArr.push(opts);
       }
     }
@@ -621,7 +621,6 @@ export class MatchTester<
     const {
       board,
       playerboards,
-      secretboard,
       gameData,
       matchData,
       random,
@@ -670,42 +669,63 @@ export class MatchTester<
 
     this._lastTurnsBegin.clear();
 
-    try {
-      let retValue;
-      if (executeNow) {
-        retValue = executeNow({
-          userId,
-          board,
-          playerboard,
-          payload,
-          _: specialExecuteFuncs,
-          ...specialExecuteFuncs,
-        });
-      }
-      if (retValue !== false && execute) {
-        execute({
-          userId,
-          board,
-          playerboards,
-          secretboard,
-          gameData,
-          matchData,
-          payload,
-          random,
-          ts: time,
-          _: specialExecuteFuncs,
-          ...specialExecuteFuncs,
-        });
-      }
-    } catch (e) {
-      console.warn(
-        "an error occured in one of the `execute*` functions in MatchTester - this means a bug in the game",
-      );
-      console.warn(e);
-      throw new Error("error in move");
-    }
+    {
+      let error = false;
+      const { board, playerboards, secretboard } = deepCopy({
+        board: this.board,
+        playerboards: this.playerboards,
+        secretboard: this.secretboard,
+      });
 
-    this.fastForward(0);
+      try {
+        let retValue;
+        if (executeNow) {
+          retValue = executeNow({
+            userId,
+            board,
+            playerboard: playerboards[userId],
+            payload,
+            _: specialExecuteFuncs,
+            ...specialExecuteFuncs,
+          });
+        }
+        if (retValue !== false && execute) {
+          execute({
+            userId,
+            board,
+            playerboards,
+            secretboard,
+            gameData,
+            matchData,
+            payload,
+            random,
+            ts: time,
+            _: specialExecuteFuncs,
+            ...specialExecuteFuncs,
+          });
+        }
+      } catch (e) {
+        error = true;
+        // TODO We should have special errors we can throw (like `InvalidMove`) that don't mean a bug in the game.
+        console.warn(
+          "an error occured in one of the `execute*` functions in MatchTester - this means a bug in the game",
+        );
+        console.warn(e);
+        if (!canFail) {
+          throw new Error("error in move");
+        }
+      }
+
+      // Only update the boards if there was no error.
+      if (!error) {
+        this.board = board;
+        this.playerboards = playerboards;
+        this.secretboard = secretboard;
+      }
+
+      // Execute the delayed moves that would happen in 0ms.
+      this.fastForward(0);
+    }
   }
 
   async start() {
