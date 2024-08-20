@@ -12,7 +12,9 @@ import { createStore as _createStore } from "zustand";
 
 import type {
   GameId,
+  GamePlayerSettings_,
   GameSetting,
+  GameSettings_,
   Locale,
   MatchPlayersSettings,
   MatchSettings,
@@ -313,13 +315,10 @@ function SettingsSection({ children }: { children: ReactNode }) {
   );
 }
 
-function MatchSettingsView() {
-  const game = useStore((state) => state.game);
+function MatchSettingsView({ gameSettings }: { gameSettings: GameSettings_ }) {
   const matchSettings = useStore((state) => state.match?.matchSettings);
 
-  const { gameSettings } = game;
-
-  if (!gameSettings || !matchSettings) {
+  if (!matchSettings) {
     return null;
   }
 
@@ -382,9 +381,13 @@ function MatchPlayerSetting({
     </div>
   );
 }
-function MatchPlayerSettings({ userId }: { userId: UserId }) {
-  const game = useStore((state) => state.game);
-  const { gamePlayerSettings } = game;
+function MatchPlayerSettings({
+  userId,
+  gamePlayerSettings,
+}: {
+  userId: UserId;
+  gamePlayerSettings: GamePlayerSettings_;
+}) {
   const matchPlayersSettings = useStore(
     (state) => state.match?.matchPlayersSettings,
   );
@@ -412,7 +415,11 @@ function MatchPlayerSettings({ userId }: { userId: UserId }) {
   );
 }
 
-function PlayerSettingsView() {
+function PlayerSettingsView({
+  gamePlayerSettings,
+}: {
+  gamePlayerSettings: GamePlayerSettings_;
+}) {
   const match = useStore((state) => state.match);
   if (!match) {
     return null;
@@ -425,7 +432,11 @@ function PlayerSettingsView() {
     <SettingsSection>
       <div className="flex flex-col space-y-4">
         {userIds.map((userId) => (
-          <MatchPlayerSettings key={userId} userId={userId} />
+          <MatchPlayerSettings
+            key={userId}
+            userId={userId}
+            gamePlayerSettings={gamePlayerSettings}
+          />
         ))}
       </div>
     </SettingsSection>
@@ -595,6 +606,9 @@ function Settings() {
   const collapsed = useStore((state) => state.collapsed);
   const view = useStore((state) => state.view);
 
+  const game = useStore((state) => state.game);
+  const { gameSettings, gamePlayerSettings } = game;
+
   if (collapsed) {
     return (
       <div className="absolute right-0 top-0">
@@ -613,12 +627,16 @@ function Settings() {
       <SettingsButtons />
       {view === "game" && (
         <>
-          <div className="max-h-60 overflow-y-auto">
-            <MatchSettingsView />
-          </div>
-          <div className="max-h-60 overflow-y-auto">
-            <PlayerSettingsView />
-          </div>
+          {!!gameSettings?.allIds?.length && (
+            <div className="max-h-60 overflow-y-auto">
+              <MatchSettingsView gameSettings={gameSettings} />
+            </div>
+          )}
+          {!!gamePlayerSettings?.allIds?.length && (
+            <div className="max-h-60 overflow-y-auto">
+              <PlayerSettingsView gamePlayerSettings={gamePlayerSettings} />
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto">
             <MatchStateView />
           </div>
