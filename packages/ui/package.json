@@ -1,6 +1,6 @@
 {
   "name": "@lefun/ui",
-  "version": "2.3.0-alpha.0",
+  "version": "2.4.0-alpha.0",
   "description": "Main dependency for writing the UI of games at https://lefun.com.",
   "author": "Simon Lemieux",
   "repository": {
