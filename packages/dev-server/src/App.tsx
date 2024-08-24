@@ -307,8 +307,8 @@ function MatchSetting({
 
 function SettingsSection({ children }: { children: ReactNode }) {
   return (
-    <div className="w-full px-1 overflow-hidden ">
-      <div className="rounded-lg bg-neutral-200 p-2 space-y-2 max-h-72 overflow-y-auto w-full">
+    <div className="w-full px-1">
+      <div className="rounded-lg bg-neutral-200 p-2 space-y-2 w-full">
         {children}
       </div>
     </div>
@@ -618,22 +618,17 @@ function Settings() {
   }
 
   return (
-    <div
-      className={classNames(
-        "flex w-1/4 min-w-60 flex-col overflow-y-auto",
-        "space-y-2",
-      )}
-    >
+    <div className={classNames("flex w-1/4 min-w-60 flex-col", "space-y-2")}>
       <SettingsButtons />
       {view === "game" && (
         <>
           {!!gameSettings?.allIds?.length && (
-            <div className="max-h-60 overflow-y-auto">
+            <div className="flex-initial max-h-1/8 overflow-y-auto">
               <MatchSettingsView gameSettings={gameSettings} />
             </div>
           )}
           {!!gamePlayerSettings?.allIds?.length && (
-            <div className="max-h-60 overflow-y-auto">
+            <div className="flex-initial max-h-1/8 overflow-y-auto">
               <PlayerSettingsView gamePlayerSettings={gamePlayerSettings} />
             </div>
           )}
