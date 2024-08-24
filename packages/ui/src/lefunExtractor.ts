@@ -72,8 +72,8 @@ export const lefunExtractor = (game: Game<any, any>) => ({
 
       // Game player settings
       if (game.gamePlayerSettings) {
-        for (const [key, setting] of Object.entries(game.gamePlayerSettings)) {
-          const { options, type } = setting;
+        for (const gamePlayerSetting of game.gamePlayerSettings) {
+          const { key, options, type } = gamePlayerSetting;
 
           // Add translations only for "string" player options.
           if (type !== "string") {
