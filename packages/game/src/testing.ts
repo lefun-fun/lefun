@@ -11,12 +11,17 @@ import {
 import { IfAnyNull } from "@lefun/core";
 
 import {
+  DelayedMove,
+  executeBoardMove,
+  executePlayerMove,
+  Stat,
+} from "./execution";
+import {
   ADD_PLAYER,
   Agent,
   AutoMove,
   AutoMoveInfo,
   BotMove,
-  DelayMove,
   Game,
   Game_,
   GameStateBase,
@@ -27,38 +32,10 @@ import {
   MATCH_WAS_ABORTED,
   parseBotMove,
   parseGame,
-  RewardPayload,
-  Turns,
 } from "./gameDef";
 import { Random } from "./random";
-import { deepCopy, parseMove, parseTurnUserIds } from "./utils";
 
-type DelayedPlayerMove = {
-  type: "playerMove";
-  name: string;
-  payload: any;
-  ts: number;
-  userId: UserId;
-};
-
-// The main different with DelayedPlayerMove is that userId is optional.
-type DelayedBoardMove = {
-  type: "boardMove";
-  name: string;
-  payload: any;
-  ts: number;
-  // We still need the `userId` when it's a move that is triggered when the player's turn expires.
-  userId?: UserId;
-};
-
-type DelayedMove = DelayedBoardMove | DelayedPlayerMove;
-
-export type MatchTesterOptions<
-  GS extends GameStateBase,
-  G extends Game<GS>, //, PMT, BMT>,
-  // PMT extends MoveTypesBase = MoveTypesBase,
-  // BMT extends MoveTypesBase = MoveTypesBase,
-> = {
+export type MatchTesterOptions<GS extends GameStateBase, G extends Game<GS>> = {
   game: G;
   getAgent?: GetAgent<GS, G>;
   autoMove?: AutoMove<GS, G>;
@@ -105,7 +82,7 @@ type MakeMoveRest<
   // any
   [] | [any] | [any, MakeMoveOptions],
   // null
-  [] | [EmptyObject, MakeMoveOptions],
+  [] | [EmptyObject | null, MakeMoveOptions],
   // other
   [GetPayload<G, K>] | [GetPayload<G, K>, MakeMoveOptions]
 >;
@@ -114,13 +91,8 @@ type MakeMoveRest<
  * Use this to test your game rules.
  * It emulates what the backend does.
  */
-export class MatchTester<
-  GS extends GameStateBase,
-  G extends Game<GS>, //, PMT, BMT>,
-  // PMT extends MoveTypesBase = MoveTypesBase,
-  // BMT extends MoveTypesBase = MoveTypesBase,
-> {
-  game: Game_<GS>; //, PMT, BMT>;
+export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
+  game: Game_<GS>;
   autoMove?: AutoMove<GS, G>;
   getAgent?: GetAgent<GS, G>;
   gameData: any;
@@ -138,11 +110,6 @@ export class MatchTester<
   time: number;
   // List of timers to be executed.
   delayedMoves: DelayedMove[];
-  // List of end of turn player moves.
-  // endOfTurnPlayerMoves: Record<UserId, DelayedMove[]>;
-
-  // List of end of turn board moves.
-  // endOfTurnBoardMoves: Record<UserId, BMT>;
 
   // To help generate the next userIds.
   nextUserId: number;
@@ -160,10 +127,6 @@ export class MatchTester<
 
   playerStats: Record<UserId, { key: string; value: number }[]>;
   matchStats: { key: string; value: number }[];
-
-  // This is hacky. We need some place to store the userIds of the players whose turn
-  // begins after a move.
-  _lastTurnsBegin: Set<UserId>;
 
   constructor({
     game,
@@ -306,7 +269,6 @@ export class MatchTester<
     this.meta = meta;
     this.time = time;
     this.delayedMoves = [];
-    // this.endOfTurnPlayerMoves = {};
     this.users = users;
     this.matchSettings = matchSettings;
     this.matchPlayersSettings = matchPlayersSettings;
@@ -319,12 +281,14 @@ export class MatchTester<
     this._agents = {};
 
     this._isPlaying = false;
-    this._lastTurnsBegin = new Set();
 
     this.playerStats = {};
     this.matchStats = [];
+
     // Make the special initial move.
-    this._makeBoardMove(INIT_MOVE);
+    if (game.boardMoves?.[INIT_MOVE]) {
+      this._makeBoardMove(INIT_MOVE);
+    }
   }
 
   /*
@@ -404,8 +368,6 @@ export class MatchTester<
   _endMatch(): void {
     this.matchHasEnded = true;
 
-    // metaMatchEnded(this.meta);
-
     // It's no-one's turn anymore.
     this.meta.players.allIds.forEach((userId) => {
       this.meta.players.byId[userId].itsYourTurn = false;
@@ -422,133 +384,54 @@ export class MatchTester<
     await this.makeNextBotMove();
   }
 
-  makeSpecialExecuteFuncs() {
-    const endMatch = () => {
+  _doMoveSideEffects({
+    matchHasEnded,
+    beginTurnUsers,
+    endTurnUsers,
+    delayedMoves,
+    stats,
+  }: {
+    matchHasEnded: boolean;
+    beginTurnUsers: Set<UserId>;
+    endTurnUsers: Set<UserId>;
+    delayedMoves: DelayedMove[];
+    stats: Stat[];
+  }) {
+    if (matchHasEnded) {
       this._endMatch();
-    };
+    }
 
-    const reward = (payload: RewardPayload) => {
-      this._botTrainingLog.push({ type: "REWARDS", ...payload });
-      if (this._verbose) {
-        console.log(payload);
-      }
-    };
+    for (const userId of beginTurnUsers) {
+      this.meta.players.byId[userId].itsYourTurn = true;
+      // Clear previous turn player moves for that player.
+      this.delayedMoves = this.delayedMoves.filter(
+        ({ userId: otherUserId }) => otherUserId !== userId,
+      );
+    }
 
-    const turnsbegin: Turns<any, any>["begin"] = (
-      userIds,
-      { expiresIn, boardMoveOnExpire, playerMoveOnExpire } = {},
-    ) => {
-      userIds = parseTurnUserIds(userIds, {
-        allUserIds: this.meta.players.allIds,
-      });
-      for (const userId of userIds) {
-        this._lastTurnsBegin.add(userId);
-        // Clear previous turn player moves for that player.
-        this.delayedMoves = this.delayedMoves.filter(
-          ({ userId: otherUserId }) => otherUserId !== userId,
-        );
+    for (const userId of endTurnUsers) {
+      this.meta.players.byId[userId].itsYourTurn = false;
+      // Clear previous turn player moves for that player.
+      this.delayedMoves = this.delayedMoves.filter(
+        ({ userId: otherUserId }) => otherUserId !== userId,
+      );
+    }
 
-        this.meta.players.byId[userId].itsYourTurn = true;
-        if (playerMoveOnExpire) {
-          const { name, payload } = parseMove(playerMoveOnExpire);
-          if (expiresIn === undefined) {
-            throw new Error("expiresIn is required for playerMoveOnExpire");
-          }
+    this.delayedMoves.push(...delayedMoves);
+    // Make sure these new delayed moves are in the right order.
+    sortDelayedMoves(this.delayedMoves);
 
-          this.delayedMoves.push({
-            type: "playerMove",
-            name,
-            payload,
-            ts: this.time + expiresIn,
-            userId,
-          });
-
-          sortDelayedMoves(this.delayedMoves);
+    for (const stat of stats) {
+      const { key, value, userId } = stat;
+      if (userId) {
+        if (!this.playerStats[userId]) {
+          this.playerStats[userId] = [];
         }
-
-        // Note that it is one boardMove per user.
-        if (boardMoveOnExpire) {
-          const { name, payload } = parseMove(boardMoveOnExpire);
-          if (expiresIn === undefined) {
-            throw new Error("expiresIn is required for playerMoveOnExpire");
-          }
-          this.delayedMoves.push({
-            type: "boardMove",
-            name,
-            payload,
-            ts: this.time + expiresIn,
-            // We need the `userId` to stop it if the player makes a move.
-            userId,
-          });
-          sortDelayedMoves(this.delayedMoves);
-        }
+        this.playerStats[userId].push({ key, value });
+      } else {
+        this.matchStats.push({ key, value });
       }
-
-      return {
-        expiresAt: expiresIn === undefined ? undefined : this.time + expiresIn,
-      };
-    };
-
-    const turnsEnd: Turns<any, any>["end"] = (userIds) => {
-      userIds = parseTurnUserIds(userIds, {
-        allUserIds: this.meta.players.allIds,
-      });
-      for (const userId of userIds) {
-        this._lastTurnsBegin.delete(userId);
-        this.meta.players.byId[userId].itsYourTurn = false;
-
-        // Clear previous turn player moves for that player.
-        this.delayedMoves = this.delayedMoves.filter(
-          ({ userId: otherUserId }) => otherUserId !== userId,
-        );
-      }
-    };
-
-    const turns: Turns<any, any> = {
-      end: turnsEnd,
-      begin: turnsbegin,
-    };
-
-    const delayMove: DelayMove = (name: string, ...payloadAndDelay: any[]) => {
-      const [payload, delay] =
-        payloadAndDelay.length === 1
-          ? [{}, payloadAndDelay[0]]
-          : payloadAndDelay;
-
-      const ts = this.time + delay;
-
-      // In the match tester, we only note the delayed move. We'll execute them only if
-      // we `fastForward`.
-      this.delayedMoves.push({
-        type: "boardMove" as const,
-        name,
-        payload,
-        ts,
-      });
-
-      sortDelayedMoves(this.delayedMoves);
-
-      return { ts };
-    };
-
-    const logPlayerStat = (userId: UserId, key: string, value: number) => {
-      if (!this.game.playerStats?.byId[key]) {
-        throw new Error(`player stat "${key}" not defined`);
-      }
-      if (!this.playerStats[userId]) {
-        this.playerStats[userId] = [];
-      }
-      this.playerStats[userId].push({ key, value });
-    };
-
-    const logMatchStat = (key: string, value: number) => {
-      if (!this.game.matchStats?.byId[key]) {
-        throw new Error(`match stat "${key}" not defined`);
-      }
-      this.matchStats.push({ key, value });
-    };
-
-    return { delayMove, turns, endMatch, reward, logPlayerStat, logMatchStat };
+    }
   }
 
   _makeBoardMove(moveName: string, payload: any = {}) {
@@ -561,46 +444,47 @@ export class MatchTester<
       matchData,
       time,
       random,
+      meta,
     } = this;
-    const { boardMoves } = game;
 
-    if (!boardMoves || !boardMoves[moveName]) {
-      // When the move is not defined, throw only if it's not one of our optional move.
-      if (![INIT_MOVE, MATCH_WAS_ABORTED].includes(moveName)) {
-        throw new Error(`board move ${moveName} not defined`);
-      }
+    const output = executeBoardMove<GS>({
+      name: moveName,
+      payload,
+      meta,
+      board,
+      playerboards,
+      secretboard,
+      matchData,
+      gameData,
+      now: time,
+      game,
+      random,
+    });
 
-      return;
-    }
+    {
+      const {
+        matchHasEnded,
+        delayedMoves,
+        beginTurnUsers,
+        endTurnUsers,
+        stats,
+      } = output;
 
-    // Not sure why we need this `any`. It causes issues only when we `watch-compile`
-    // the code
-    const { execute } = boardMoves[moveName] as any;
-
-    if (!execute) {
-      console.warn(`board move "${moveName}" not defined`);
-      return;
-    }
-
-    const specialExecuteFuncs = this.makeSpecialExecuteFuncs();
-
-    try {
-      execute({
-        board,
-        playerboards,
-        // We trust that the game developer won't use the secretboard if it's not
-        // defined!
-        secretboard,
-        payload,
-        gameData,
-        matchData,
-        random,
-        ts: time,
-        ...specialExecuteFuncs,
+      this._doMoveSideEffects({
+        matchHasEnded,
+        delayedMoves,
+        beginTurnUsers,
+        endTurnUsers,
+        stats,
       });
-    } catch (e) {
-      console.warn(`board move "${moveName}" failed with error`);
-      console.warn(e);
+    }
+
+    {
+      const { board, playerboards, secretboard } = output;
+
+      this.board = board;
+      this.playerboards = playerboards;
+      this.secretboard = secretboard;
     }
 
     this.fastForward(0);
@@ -621,6 +505,7 @@ export class MatchTester<
     const {
       board,
       playerboards,
+      secretboard,
       gameData,
       matchData,
       random,
@@ -629,103 +514,63 @@ export class MatchTester<
       time,
     } = this;
 
-    if (!game.playerMoves[moveName]) {
-      throw new Error(`game does not implement ${moveName}`);
-    }
-
-    // Make sure the userId is in our list of users.
-    if (meta.players.byId[userId] === undefined) {
-      throw new Error(`unknown userId ${userId}`);
-    }
-
-    const { playerMoves } = game;
-
-    const moveDef = playerMoves[moveName];
-
-    if (!moveDef) {
-      throw new Error(`unknown move ${moveName}`);
-    }
-
-    const playerboard = playerboards[userId];
-
-    const { canDo, executeNow, execute } = game.playerMoves[moveName];
-
-    if (
-      !isDelayed &&
-      canDo &&
-      !canDo({ userId, board, playerboard, payload, ts: time })
-    ) {
-      if (!canFail) {
-        throw new Error(`can not do move "${moveName}"`);
+    let error = false;
+    let output: ReturnType<typeof executePlayerMove<GS>> | undefined =
+      undefined;
+    try {
+      output = executePlayerMove<GS>({
+        name: moveName,
+        payload,
+        userId,
+        meta,
+        board,
+        playerboards,
+        secretboard,
+        matchData,
+        gameData,
+        now: time,
+        game,
+        random,
+        skipCanDo: !!isDelayed,
+      });
+    } catch (e) {
+      error = true;
+      if (canFail) {
+        console.warn("Error but canFail=true");
+        console.warn(e);
+      } else {
+        throw e;
       }
-
-      console.warn(`can not do move "${moveName}"`);
-      return;
     }
 
-    const specialExecuteFuncs = this.makeSpecialExecuteFuncs();
+    if (!error && output) {
+      const {
+        matchHasEnded,
+        delayedMoves,
+        beginTurnUsers,
+        endTurnUsers,
+        stats,
+      } = output;
 
-    // const { turns } = specialExecuteFuncs;
-
-    this._lastTurnsBegin.clear();
-
-    {
-      let error = false;
-      const { board, playerboards, secretboard } = deepCopy({
-        board: this.board,
-        playerboards: this.playerboards,
-        secretboard: this.secretboard,
+      this._doMoveSideEffects({
+        matchHasEnded,
+        delayedMoves,
+        beginTurnUsers,
+        endTurnUsers,
+        stats,
       });
 
-      try {
-        let retValue;
-        if (executeNow) {
-          retValue = executeNow({
-            userId,
-            board,
-            playerboard: playerboards[userId],
-            payload,
-            _: specialExecuteFuncs,
-            ...specialExecuteFuncs,
-          });
-        }
-        if (retValue !== false && execute) {
-          execute({
-            userId,
-            board,
-            playerboards,
-            secretboard,
-            gameData,
-            matchData,
-            payload,
-            random,
-            ts: time,
-            _: specialExecuteFuncs,
-            ...specialExecuteFuncs,
-          });
-        }
-      } catch (e) {
-        error = true;
-        // TODO We should have special errors we can throw (like `InvalidMove`) that don't mean a bug in the game.
-        console.warn(
-          "an error occured in one of the `execute*` functions in MatchTester - this means a bug in the game",
-        );
-        console.warn(e);
-        if (!canFail) {
-          throw new Error("error in move");
-        }
-      }
+      {
+        const { board, playerboards, secretboard } = output;
 
-      // Only update the boards if there was no error.
-      if (!error) {
         this.board = board;
         this.playerboards = playerboards;
         this.secretboard = secretboard;
       }
-
-      // Execute the delayed moves that would happen in 0ms.
-      this.fastForward(0);
     }
+
+    // Execute the delayed moves that would happen in 0ms.
+    this.fastForward(0);
   }
 
   async start() {
@@ -759,6 +604,11 @@ export class MatchTester<
       // Return because `start` calls makeNextBotMove.
       return;
     }
+
+    if (this.matchHasEnded) {
+      return;
+    }
+
     const { meta, game, autoMove, board, playerboards, secretboard, random } =
       this;
     // Check if we should do a bot move.

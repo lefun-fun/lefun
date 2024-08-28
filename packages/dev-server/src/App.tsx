@@ -117,7 +117,7 @@ const BoardForPlayer = ({
             ts: now,
           });
           if (!canTheyDo) {
-            console.warn(`user ${userId} cannot do move ${name}`);
+            console.warn(`user ${userId} can not do move ${name}`);
             return;
           }
         }

@@ -307,3 +307,34 @@ test("error in move does not get applied", () => {
 
   expect(match.board.x).toBe(0);
 });
+
+test("canFail", () => {
+  type B = {
+    x: number;
+  };
+  type GS = GameState<B>;
+  const game = {
+    ...gameBase,
+    initialBoards: () => ({ board: { x: 0 } }),
+    playerMoves: {
+      go: {
+        execute({ board }) {
+          board.x++;
+          throw new Error("error");
+        },
+      } as PlayerMove<GS, null>,
+    },
+  } satisfies Game<GS>;
+
+  const match = new MatchTester<GS, typeof game>({ game, numPlayers: 1 });
+
+  const userId = match.meta.players.allIds[0];
+
+  match.makeMove(userId, "go", null, { canFail: true });
+
+  expect(() => {
+    match.makeMove(userId, "go", null, { canFail: false });
+  }).toThrowError("error");
+
+  expect(match.board.x).toBe(0);
+});
