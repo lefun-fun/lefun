@@ -338,3 +338,24 @@ test("canFail", () => {
 
   expect(match.board.x).toBe(0);
 });
+
+test("end match ends turns", () => {
+  const game = {
+    ...gameBase,
+    initialBoards: () => ({ board: { x: 0 } }),
+    playerMoves: {
+      go: {
+        execute({ userId, board, _ }) {
+          _.turns.begin(userId);
+          _.endMatch();
+        },
+      },
+    },
+  } satisfies Game;
+
+  const match = new MatchTester({ game, numPlayers: 1 });
+  const userId = match.meta.players.allIds[0];
+  match.makeMove(userId, "go");
+  expect(match.matchHasEnded).toBe(true);
+  expect(match.meta.players.byId[userId].itsYourTurn).toBe(false);
+});

@@ -397,10 +397,6 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     delayedMoves: DelayedMove[];
     stats: Stat[];
   }) {
-    if (matchHasEnded) {
-      this._endMatch();
-    }
-
     for (const userId of beginTurnUsers) {
       this.meta.players.byId[userId].itsYourTurn = true;
       // Clear previous turn player moves for that player.
@@ -431,6 +427,11 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
       } else {
         this.matchStats.push({ key, value });
       }
+    }
+
+    // Do this *after* the turns because it will end all turns.
+    if (matchHasEnded) {
+      this._endMatch();
     }
   }
 
