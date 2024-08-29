@@ -1,7 +1,7 @@
 {
   "name": "@lefun/dev-server",
   "version": "2.5.2",
-  "description": "Development server to run games developed for https://lefun.com.",
+  "description": "Development server to run games developed for https://lefun.fun.",
   "author": "Simon Lemieux",
   "repository": {
     "type": "git",

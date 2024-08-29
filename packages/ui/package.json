@@ -1,7 +1,7 @@
 {
   "name": "@lefun/ui",
   "version": "2.5.2",
-  "description": "Main dependency for writing the UI of games at https://lefun.com.",
+  "description": "Main dependency for writing the UI of games at https://lefun.fun.",
   "author": "Simon Lemieux",
   "repository": {
     "type": "git",
