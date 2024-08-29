@@ -399,7 +399,8 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
   }) {
     for (const userId of beginTurnUsers) {
       this.meta.players.byId[userId].itsYourTurn = true;
-      // Clear previous turn player moves for that player.
+      // Clear previous turn player moves for that player: in other words only the
+      // lastest `turns.begin` counts for a given player.
       this.delayedMoves = this.delayedMoves.filter(
         ({ userId: otherUserId }) => otherUserId !== userId,
       );

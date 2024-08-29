@@ -163,6 +163,44 @@ describe("turns", () => {
     match.makeMove(userId, "go", {});
     expect(match.board.expiresAt).toEqual(1000);
   });
+
+  test("double begin turn: only the latest counts", () => {
+    type B = {
+      x: string;
+    };
+    type GS = GameState<B>;
+    const game = {
+      ...gameBase,
+      initialBoards: () => ({ board: { x: "" } }),
+      playerMoves: {
+        add: {
+          executeNow({ board, payload }) {
+            board.x += payload.x;
+          },
+        } as PlayerMove<GS, { x: string }>,
+        begin: {
+          execute({ userId, payload, _ }) {
+            _.turns.begin(userId, {
+              expiresIn: 10,
+              playerMoveOnExpire: ["add", { x: payload.onExpire }],
+            });
+          },
+        } as PlayerMove<GS, { onExpire: string }>,
+      },
+    } satisfies Game<GS>;
+
+    const match = new MatchTester<GS, typeof game>({ game, numPlayers: 1 });
+    const userId = match.meta.players.allIds[0];
+    match.makeMove(userId, "begin", { onExpire: "a" });
+    expect(match.board.x).toBe("");
+    match.fastForward(10);
+    expect(match.board.x).toBe("a");
+
+    match.makeMove(userId, "begin", { onExpire: "b" });
+    match.makeMove(userId, "begin", { onExpire: "c" });
+    match.fastForward(20);
+    expect(match.board.x).toBe("ac");
+  });
 });
 
 describe("fastForward", () => {
@@ -345,7 +383,7 @@ test("end match ends turns", () => {
     initialBoards: () => ({ board: { x: 0 } }),
     playerMoves: {
       go: {
-        execute({ userId, board, _ }) {
+        execute({ userId, _ }) {
           _.turns.begin(userId);
           _.endMatch();
         },
