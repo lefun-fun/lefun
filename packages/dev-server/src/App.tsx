@@ -295,9 +295,9 @@ function MatchSetting({
           });
         }}
       >
-        {options.map(({ value }) => (
+        {options.map(({ value, isDefault }) => (
           <option key={value} value={value}>
-            {value}
+            {value} {isDefault ? " (default)" : ""}
           </option>
         ))}
       </select>
@@ -372,9 +372,9 @@ function MatchPlayerSetting({
           });
         }}
       >
-        {options.map(({ value }) => (
+        {options.map(({ value, isDefault }) => (
           <option key={value} value={value}>
-            {value}
+            {value} {isDefault ? " (default)" : ""}
           </option>
         ))}
       </select>
@@ -796,12 +796,8 @@ const initMatch = ({
     if (gameSettings) {
       matchSettings = Object.fromEntries(
         gameSettings.allIds.map((key) => {
-          for (const { value, isDefault } of gameSettings.byId[key].options) {
-            if (isDefault) {
-              return [key, value];
-            }
-          }
-          return [key, gameSettings.byId[key].options[0].value];
+          const defaultValue = gameSettings.byId[key].defaultValue;
+          return [key, defaultValue];
         }),
       );
     }

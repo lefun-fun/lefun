@@ -479,6 +479,36 @@ function normalizeStats(stats: GameStats | undefined): GameStats_ {
   return stats_;
 }
 
+function normalizeSettings(settings: GameSettings): GameSettings_;
+function normalizeSettings(settings: GamePlayerSettings): GamePlayerSettings_;
+function normalizeSettings(settings: GameSettings | GamePlayerSettings) {
+  const newSettings = normalizeArray(settings, "key");
+
+  // Find the default values.
+  for (const key of newSettings.allIds) {
+    const gameSetting = newSettings.byId[key];
+
+    let defaultValue: string | null = null;
+    let numDefault = 0;
+
+    for (const { value, isDefault } of gameSetting.options) {
+      if (isDefault) {
+        defaultValue = value;
+        numDefault++;
+      }
+    }
+
+    if (numDefault > 1) {
+      throw new Error(`multiple default values for game setting ${key}`);
+    }
+
+    (gameSetting as any).defaultValue =
+      defaultValue ?? gameSetting.options[0].value;
+  }
+
+  return newSettings;
+}
+
 /*
  * Parse a @lefun/game game definition into our internal game definition.
  */
@@ -489,8 +519,10 @@ export function parseGame<
 >(game: Game<GS, PMT, BMT>): Game_<GS, PMT, BMT> {
   const playerStats = normalizeStats(game.playerStats);
   const matchStats = normalizeStats(game.matchStats);
-  const gameSettings = normalizeArray(game.gameSettings, "key");
-  const gamePlayerSettings = normalizeArray(game.gamePlayerSettings, "key");
+  const gameSettings =
+    game.gameSettings && normalizeSettings(game.gameSettings);
+  const gamePlayerSettings =
+    game.gamePlayerSettings && normalizeSettings(game.gamePlayerSettings);
 
   return { ...game, playerStats, matchStats, gameSettings, gamePlayerSettings };
 }

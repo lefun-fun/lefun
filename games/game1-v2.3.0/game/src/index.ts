@@ -133,7 +133,10 @@ const gameSettings: GameSettings = [
     key: "setting1",
     options: [{ value: "a" }, { value: "b" }],
   },
-  { key: "setting2", options: [{ value: "x" }, { value: "y" }] },
+  {
+    key: "setting2",
+    options: [{ value: "x" }, { value: "y", isDefault: true }],
+  },
 ];
 
 const gamePlayerSettings: GamePlayerSettings = [
@@ -157,7 +160,7 @@ const gamePlayerSettings: GamePlayerSettings = [
   {
     key: "dieNumFaces",
     type: "string",
-    options: [{ value: "6" }, { value: "20" }],
+    options: [{ value: "6", isDefault: true }, { value: "20" }],
   },
 ];
 

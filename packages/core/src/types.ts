@@ -37,6 +37,7 @@ export type GameSetting = {
   // * `previousMatchValue`
   // * The first option `default: true`
   // * The first option
+  // This logic si defined where we set `defaultValue`.
   //
   // If your implement this function, don't forget to return `previousMatchValue` when
   // it is defined, if you want to keep that behaviour!
@@ -53,7 +54,14 @@ export type GameSettings = GameSetting[];
 
 export type GameSettings_ = {
   allIds: string[];
-  byId: Record<string, GameSetting>;
+  byId: Record<
+    string,
+    GameSetting & {
+      // We set this from the `isDefault` option if there is one.
+      // This avoids the need to loop through all the options to find it.
+      defaultValue: string;
+    }
+  >;
 };
 
 /*
@@ -104,7 +112,7 @@ export type GamePlayerSettings = GamePlayerSetting[];
 
 export type GamePlayerSettings_ = {
   allIds: string[];
-  byId: Record<string, GamePlayerSetting>;
+  byId: Record<string, GamePlayerSetting & { defaultValue: string }>;
 };
 
 export type GameStatType =
