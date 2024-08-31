@@ -125,8 +125,9 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
   _agents: Record<UserId, Agent<GS, G>>;
   _isPlaying: boolean;
 
-  playerStats: Record<UserId, { key: string; value: number }[]>;
-  matchStats: { key: string; value: number }[];
+  // Stats are lists of {key: value}.
+  playerStats: Record<UserId, Omit<Stat, "userId">[]>;
+  matchStats: Omit<Stat, "userId">[];
 
   constructor({
     game,

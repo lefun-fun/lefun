@@ -397,3 +397,69 @@ test("end match ends turns", () => {
   expect(match.matchHasEnded).toBe(true);
   expect(match.meta.players.byId[userId].itsYourTurn).toBe(false);
 });
+
+test("log stats", () => {
+  const game = {
+    ...gameBase,
+    matchStats: [
+      {
+        key: "patate",
+        type: "number",
+      },
+    ],
+    playerStats: [
+      {
+        key: "poil",
+        type: "boolean",
+      },
+    ],
+    initialBoards: () => ({ board: { x: 0 } }),
+    playerMoves: {
+      go: {
+        execute({ userId, _ }) {
+          _.logMatchStat("patate", 0);
+          _.logPlayerStat(userId, "poil", 1);
+        },
+      },
+      end: {
+        execute({ _ }) {
+          _.endMatch();
+          _.logMatchStat("patate", 123);
+        },
+      },
+    },
+  } satisfies Game;
+
+  const match = new MatchTester({ game, numPlayers: 2 });
+  const [p0, p1] = match.meta.players.allIds;
+
+  match.makeMove(p0, "go");
+  expect(match.matchHasEnded).toBe(false);
+
+  expect(match.matchStats).toEqual([{ key: "patate", value: 0 }]);
+  expect(match.playerStats).toEqual({ [p0]: [{ key: "poil", value: 1 }] });
+
+  match.makeMove(p1, "go");
+  expect(match.matchHasEnded).toBe(false);
+  expect(match.matchStats).toEqual([
+    { key: "patate", value: 0 },
+    { key: "patate", value: 0 },
+  ]);
+  expect(match.playerStats).toEqual({
+    [p0]: [{ key: "poil", value: 1 }],
+    [p1]: [{ key: "poil", value: 1 }],
+  });
+
+  match.makeMove(p0, "end");
+  expect(match.matchHasEnded).toBe(true);
+
+  expect(match.matchStats).toEqual([
+    { key: "patate", value: 0 },
+    { key: "patate", value: 0 },
+    { key: "patate", value: 123 },
+  ]);
+  expect(match.playerStats).toEqual({
+    [p0]: [{ key: "poil", value: 1 }],
+    [p1]: [{ key: "poil", value: 1 }],
+  });
+});
