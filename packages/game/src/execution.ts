@@ -231,6 +231,7 @@ type SideEffectResults = {
   endTurnUsers: Set<UserId>;
   delayedMoves: DelayedMove[];
   stats: Stat[];
+  rewards: Record<UserId, number>;
 };
 
 function defineMoveSideEffects<GS extends GameStateBase>({
@@ -248,6 +249,7 @@ function defineMoveSideEffects<GS extends GameStateBase>({
     endTurnUsers: new Set(),
     delayedMoves: [],
     stats: [],
+    rewards: {},
   };
 
   const endMatch = () => {
@@ -349,6 +351,10 @@ function defineMoveSideEffects<GS extends GameStateBase>({
     sideEffectResults.stats.push({ key, value });
   };
 
+  const reward = ({ rewards }: { rewards: Record<UserId, number> }) => {
+    sideEffectResults.rewards = rewards;
+  };
+
   const moveSideEffects: MoveSideEffects = {
     delayMove,
     turns: {
@@ -358,6 +364,7 @@ function defineMoveSideEffects<GS extends GameStateBase>({
     endMatch,
     logPlayerStat,
     logMatchStat,
+    reward,
   };
 
   return { moveSideEffects, sideEffectResults };

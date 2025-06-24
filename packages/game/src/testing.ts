@@ -391,12 +391,14 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     endTurnUsers,
     delayedMoves,
     stats,
+    rewards,
   }: {
     matchHasEnded: boolean;
     beginTurnUsers: Set<UserId>;
     endTurnUsers: Set<UserId>;
     delayedMoves: DelayedMove[];
     stats: Stat[];
+    rewards: Record<UserId, number>;
   }) {
     for (const userId of beginTurnUsers) {
       this.meta.players.byId[userId].itsYourTurn = true;
@@ -435,6 +437,10 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     if (matchHasEnded) {
       this._endMatch();
     }
+
+    if (rewards) {
+      this._botTrainingLog.push({ type: "REWARDS", rewards });
+    }
   }
 
   _makeBoardMove(moveName: string, payload: any = {}) {
@@ -471,6 +477,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
         beginTurnUsers,
         endTurnUsers,
         stats,
+        rewards,
       } = output;
 
       this._doMoveSideEffects({
@@ -479,6 +486,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
         beginTurnUsers,
         endTurnUsers,
         stats,
+        rewards,
       });
     }
 
@@ -553,6 +561,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
         beginTurnUsers,
         endTurnUsers,
         stats,
+        rewards,
       } = output;
 
       this._doMoveSideEffects({
@@ -561,6 +570,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
         beginTurnUsers,
         endTurnUsers,
         stats,
+        rewards,
       });
 
       {

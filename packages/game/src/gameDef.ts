@@ -319,7 +319,7 @@ export type AutoMove<GS extends GameStateBase, G extends Game<GS>> = (arg0: {
   secretboard: GS["SB"];
   random: Random;
   withInfo: boolean;
-}) => BotMove<G>;
+}) => BotMove<G> | BotMove<G>[];
 
 /*
  * Return a stateful way (a `Agent` class) to get bot moves.
@@ -357,7 +357,7 @@ export abstract class Agent<GS extends GameStateBase, G extends Game<GS>> {
     userId: UserId;
     withInfo: boolean;
     verbose?: boolean;
-  }): Promise<BotMove<G>>;
+  }): Promise<BotMove<G> | BotMove<G>[]>;
 }
 
 export type GetMatchScoreTextOptions<B> = {
