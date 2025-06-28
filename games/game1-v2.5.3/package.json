@@ -58,8 +58,7 @@
     "vitest": "^2.0.5"
   },
   "dependencies": {
-    "classnames": "^2.5.1",
-    "game1-v2.3.0-game": "workspace:*"
+    "classnames": "^2.5.1"
   },
   "peerDependencies": {
     "@lefun/core": "workspace:*",

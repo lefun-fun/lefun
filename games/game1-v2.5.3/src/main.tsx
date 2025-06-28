@@ -1,7 +1,6 @@
 import { render } from "@lefun/dev-server";
 
-import { game } from "game1-v2.3.0-game";
-
+import { game } from "./game";
 // @ts-expect-error abc
 import { messages as en } from "./locales/en/messages";
 // @ts-expect-error abc
@@ -16,5 +15,5 @@ render({
   },
   game,
   messages: { en, fr },
-  gameId: "game1-v2.3.0",
+  gameId: "game1-v2.5.3",
 });
