@@ -12,7 +12,7 @@ import {
   useUsername,
 } from "@lefun/ui";
 
-import type { G, GS } from "game1-v2.3.0-game";
+import type { G, GS } from "./game";
 
 const useSelector = makeUseSelector<GS>();
 const useSelectorShallow = makeUseSelectorShallow<GS>();

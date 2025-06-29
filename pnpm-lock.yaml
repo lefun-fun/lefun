@@ -124,9 +124,6 @@ importers:
       classnames:
         specifier: ^2.5.1
         version: 2.5.1
-      game1-v2.3.0-game:
-        specifier: workspace:*
-        version: link:../game1-v2.3.0/game
     devDependencies:
       '@babel/preset-react':
         specifier: ^7.24.7
