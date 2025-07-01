@@ -45,19 +45,6 @@ type DelayedBoardMove = {
 
 export type DelayedMove = DelayedBoardMove | DelayedPlayerMove;
 
-export type ExecuteMoveOutput = {
-  matchHasEnded: boolean;
-  patches: Patch[];
-  error?: string;
-  delayedMoves: DelayedMove[];
-  beginTurnUsers: Set<UserId>;
-  endTurnUsers: Set<UserId>;
-  board: unknown;
-  playerboards: Record<UserId, unknown>;
-  secretboard: unknown;
-  stats: Stat[];
-};
-
 function tryProduceWithPatches<T>(
   input: T,
   func: (arg0: T) => void,
@@ -93,6 +80,34 @@ function tryProduceWithPatches<T>(
   };
 }
 
+type MoveExecutionOutput = {
+  board: unknown;
+  playerboards: Record<UserId, unknown>;
+  secretboard: unknown;
+  patches: Patch[];
+} & SideEffectResults;
+
+type BoardMoveExecutionInput<GS extends GameStateBase> = {
+  name: string;
+  payload: unknown;
+  game: Game_<GS>;
+  board: GS["B"];
+  playerboards: Record<UserId, GS["PB"]>;
+  secretboard: GS["SB"];
+  matchData: unknown;
+  gameData: unknown;
+  now: number;
+  random: Random;
+  meta: Meta;
+};
+
+type PlayerMoveExecutionInput<GS extends GameStateBase> =
+  BoardMoveExecutionInput<GS> & {
+    userId: UserId;
+    skipCanDo?: boolean;
+    onlyExecuteNow?: boolean;
+  };
+
 export function executePlayerMove<GS extends GameStateBase>({
   name,
   payload,
@@ -108,22 +123,7 @@ export function executePlayerMove<GS extends GameStateBase>({
   skipCanDo = false,
   onlyExecuteNow = false,
   meta,
-}: {
-  name: string;
-  payload: unknown;
-  game: Game_<GS>;
-  userId: UserId;
-  board: GS["B"];
-  playerboards: Record<UserId, GS["PB"]>;
-  secretboard: GS["SB"];
-  matchData: unknown;
-  gameData: unknown;
-  now: number;
-  random: Random;
-  skipCanDo?: boolean;
-  onlyExecuteNow?: boolean;
-  meta: Meta;
-}) {
+}: PlayerMoveExecutionInput<GS>): MoveExecutionOutput {
   // This is a "normal" player move.
   const moveDef = game.playerMoves[name];
 
@@ -400,19 +400,7 @@ export function executeBoardMove<GS extends GameStateBase>({
   now,
   random,
   meta,
-}: {
-  name: string;
-  payload: unknown;
-  game: Game_<GS>;
-  board: GS["B"];
-  playerboards: Record<UserId, GS["PB"]>;
-  secretboard: GS["SB"];
-  matchData: unknown;
-  gameData: unknown;
-  now: number;
-  random: Random;
-  meta: Meta;
-}) {
+}: BoardMoveExecutionInput<GS>): MoveExecutionOutput {
   const execute = getBoardMoveExecuteFunc(game, name);
 
   const { moveSideEffects, sideEffectResults } = defineMoveSideEffects({

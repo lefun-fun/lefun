@@ -74,7 +74,7 @@ function createStore({ locales, game }: { locales: Locale[]; game: Game_ }) {
     match: undefined,
     game,
     resetMatch: () => {
-      //
+      // This is set in App.tsx
     },
     toggleShowDimensions: () => {
       set((state) => ({ showDimensions: !state.showDimensions }));

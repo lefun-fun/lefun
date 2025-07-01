@@ -1,47 +1,54 @@
-import { Draft, Patch, produceWithPatches } from "immer";
-import { createStore, StoreApi } from "zustand";
+import { Patch } from "immer";
 
 import {
   Locale,
   MatchPlayersSettings,
   MatchSettings,
+  Meta,
+  metaAddUserToMatch,
+  metaInitialState,
   User,
   UserId,
+  UsersState,
 } from "@lefun/core";
-import { Game_, MoveSideEffects, Random } from "@lefun/game";
+import { executePlayerMove, Game_, Random } from "@lefun/game";
 
-type State = {
+// This is what would normally go in a database.
+type MatchStore = {
   board: unknown;
   playerboards: Record<UserId, unknown>;
   secretboard: unknown;
+  //
+  meta: Meta;
+  matchData: unknown;
+  gameData: unknown;
+  matchSettings: MatchSettings;
+  matchPlayersSettings: MatchPlayersSettings;
+  //
+  users: UsersState;
+  // TODO Deal with stats
+  // matchStats: null;
+  // playerStats: null;
+  // delayedMoves: DelayedMove[];
 };
 
 // We increment this every time we make backward incompatible changes in the match
 // saved to local storage. We save this version with the match to later detect that
 // a saved match is too old.
-const VERSION = 2;
+const VERSION = 3;
 
+/* This class replaces our backend */
 class Match extends EventTarget {
   random: Random;
   game: Game_;
-  // These will be serialized with the Match.
-  players: Record<UserId, User>;
-  matchData: unknown;
-  gameData: unknown;
-  matchSettings: MatchSettings;
-  matchPlayersSettings: MatchPlayersSettings;
-  // Locale at the time of creating the match. This is not necessarily the same as the
-  // current selected locale.
-  locale: Locale;
+  store: MatchStore;
+  // We increment this on every move. Some parts of the UI watch this
+  // and refresh when it changes.
+  moveNum = 0;
 
-  get numPlayers() {
-    return Object.keys(this.players).length;
-  }
-
-  // Store that represents the backend.
+  // Store that represents the DB.
   // We need to put it in a zustand Store because we want the JSON view in the right
   // panel to refresh with changes of state.
-  store: StoreApi<State>;
 
   constructor({
     game,
@@ -51,8 +58,6 @@ class Match extends EventTarget {
     matchData,
     gameData,
     locale,
-    //
-    state,
   }: {
     game: Game_;
     players: Record<UserId, User>;
@@ -61,228 +66,164 @@ class Match extends EventTarget {
     matchData: unknown;
     gameData: unknown;
     locale: Locale;
+  });
+  constructor({ game, store }: { game: Game_; store: MatchStore });
+  constructor({
+    game,
+    players,
+    matchSettings,
+    matchPlayersSettings,
+    matchData,
+    gameData,
+    locale,
     //
-    state?: State;
+    store,
+  }: {
+    game: Game_;
+    players?: Record<UserId, User>;
+    matchSettings?: MatchSettings;
+    matchPlayersSettings?: MatchPlayersSettings;
+    matchData?: unknown;
+    gameData?: unknown;
+    locale?: Locale;
+    //
+    store?: MatchStore;
   }) {
     super();
 
     const random = new Random();
     this.random = random;
     this.game = game;
-    this.players = players;
-    this.matchData = matchData;
-    this.gameData = gameData;
-    this.matchSettings = matchSettings;
-    this.matchPlayersSettings = matchPlayersSettings;
-    this.locale = locale;
 
-    if (state) {
-      this.store = createStore(() => state as State);
-    } else {
-      const areBots = Object.fromEntries(
-        Object.entries(players).map(([userId, { isBot }]) => [userId, !!isBot]),
-      );
-
-      const userIds = Object.keys(players);
-
-      // We do this once to make sure we have the same data for everyplayer.
-      // Then we'll deep copy the boards to make sure they are not linked.
-      const initialBoards = game.initialBoards({
-        players: userIds,
-        matchSettings,
-        matchPlayersSettings,
-        matchData,
-        gameData,
-        random,
-        areBots,
-        locale,
-        ts: new Date().getTime(),
-      });
-
-      const { board, secretboard = {} } = initialBoards;
-      let { playerboards } = initialBoards;
-
-      if (!playerboards) {
-        playerboards = {};
-        for (const userId of userIds) {
-          playerboards[userId] = {};
-        }
-      }
-
-      this.store = createStore(() => ({
-        board,
-        playerboards,
-        secretboard,
-      }));
-    }
-  }
-
-  makeMove(userId: UserId, moveName: string, payload: any) {
-    const now = new Date().getTime();
-
-    // Here the `store` is the store for the player making the move, since
-    // we're in the `useMakeMove` hook that points to the store from the context.
-    if (userId === undefined) {
-      throw new Error("we still have bugs with those userId in moves");
-    }
-
-    if (!this.players[userId]) {
-      console.warn(`user "${userId}" not in match`);
+    // If a store is provided, there isn't much to do.
+    if (store) {
+      this.store = store;
       return;
     }
 
-    if (!this.store) {
-      throw new Error("no store");
+    // If this is a brand new match, then we initialize all the parts of the store.
+    if (!players || !locale || !matchSettings || !matchPlayersSettings) {
+      throw new Error("everything should be defined");
     }
 
-    // TODO Reuse code from the `execution.ts` file.
-    const { executeNow, execute } = this.game.playerMoves[moveName];
-
-    const userIds = Object.keys(this.players);
-
-    const patchesByUserId: Record<UserId, Patch[]> = Object.fromEntries(
-      userIds.map((userId) => [userId, []]),
+    const areBots = Object.fromEntries(
+      Object.entries(players).map(([userId, { isBot }]) => [userId, !!isBot]),
     );
-    patchesByUserId["spectator"] = [];
 
-    const sideEffects: MoveSideEffects = {
-      delayMove() {
-        console.warn("delayMove not implemented yet");
-        return { ts: 0 };
-      },
-      endMatch() {
-        console.warn("endMatch not implemented");
-      },
-      logPlayerStat() {
-        console.warn("logPlayerStat not implemented");
-      },
-      logMatchStat() {
-        console.warn("logMatchStat not implemented");
-      },
-      turns: {
-        begin() {
-          console.warn("turns.begin not implemented");
-          return { expiresAt: 0 };
-        },
-        end() {
-          console.warn("turns.end not implemented");
-        },
-      },
+    const userIds = Object.keys(players);
+
+    const meta = metaInitialState({ matchSettings, locale });
+    const ts = new Date();
+    for (const userId of userIds) {
+      metaAddUserToMatch({ meta, userId, ts, isBot: false });
+    }
+
+    const users: UsersState = {
+      byId: players,
     };
 
-    if (executeNow) {
-      // Also run `executeNow` on the local state.
-      this.store.setState((state: State) => {
-        const [newState, patches] = produceWithPatches(
-          state,
-          (draft: Draft<State>) => {
-            const { board, playerboards } = draft;
-            executeNow({
-              // We have had issues with the combination of `setState` and
-              // `produceWithPatches`. Copying the `payload` seems to work as a
-              // workaround.
-              payload: JSON.parse(JSON.stringify(payload)),
-              userId,
-              board,
-              playerboard: playerboards[userId],
-              _: sideEffects,
-              ...sideEffects,
-            });
-          },
-        );
+    // We do this once to make sure we have the same data for everyplayer.
+    // Then we'll deep copy the boards to make sure they are not linked.
+    const initialBoards = game.initialBoards({
+      players: userIds,
+      matchSettings,
+      matchPlayersSettings,
+      matchData,
+      gameData,
+      random,
+      areBots,
+      locale,
+      ts: new Date().getTime(),
+    });
 
-        separatePatchesByUser({
-          patches,
-          userIds,
-          ignoreUserId: userId,
-          patchesOut: patchesByUserId,
-        });
-        return newState;
-      });
+    const { board, secretboard = {} } = initialBoards;
+    const playerboards =
+      initialBoards.playerboards ||
+      Object.fromEntries(userIds.map((userId) => [userId, {}]));
+
+    this.store = {
+      meta,
+      //
+      matchSettings,
+      matchPlayersSettings,
+      //
+      board,
+      playerboards,
+      secretboard,
+      //
+      matchData,
+      gameData,
+      //
+      users,
+    };
+  }
+
+  makeMove(userId: UserId, moveName: string, payload: any) {
+    // Execute the move.
+    const now = new Date().getTime();
+    const { game, random, store } = this;
+    const { meta, board, playerboards, secretboard, matchData, gameData } =
+      store;
+    const result = executePlayerMove({
+      name: moveName,
+      payload,
+      game,
+      now,
+      userId,
+      board,
+      playerboards,
+      secretboard,
+      random,
+      meta,
+      matchData,
+      gameData,
+    });
+
+    // Update the store.
+    {
+      const { board, playerboards, secretboard } = result;
+      store.board = board;
+      store.playerboards = playerboards;
+      store.secretboard = secretboard;
     }
 
-    if (execute) {
-      const { matchData, gameData, random, store } = this;
-      store.setState((state: State) => {
-        const [newState, patches] = produceWithPatches(
-          state,
-          (
-            draft: Draft<{
-              board: unknown;
-              playerboards: Record<UserId, unknown>;
-              secretboard: unknown;
-            }>,
-          ) => {
-            const { board, playerboards, secretboard } = draft;
-            execute({
-              payload,
-              userId,
-              board,
-              playerboards,
-              secretboard,
-              matchData,
-              gameData,
-              random,
-              ts: now,
-              _: sideEffects,
-              ...sideEffects,
-            });
-          },
-        );
-        separatePatchesByUser({
-          patches,
-          userIds,
-          patchesOut: patchesByUserId,
-        });
-        return newState;
-      });
-    }
-
-    for (const [userId, patches] of Object.entries(patchesByUserId)) {
-      if (patches.length === 0) {
-        continue;
-      }
-      this.dispatchEvent(
-        new CustomEvent(`move:${userId}`, { detail: { patches } }),
+    // Send out patches to users.
+    {
+      const userIds = store.meta.players.allIds;
+      const patchesByUserId: Record<UserId, Patch[]> = Object.fromEntries(
+        userIds.map((userId) => [userId, []]),
       );
-    }
+      patchesByUserId["spectator"] = [];
 
-    return patchesByUserId;
+      const { patches } = result;
+
+      separatePatchesByUser({
+        patches,
+        userIds,
+        patchesOut: patchesByUserId,
+      });
+
+      for (const [userId, patches] of Object.entries(patchesByUserId)) {
+        if (patches.length === 0) {
+          continue;
+        }
+        this.dispatchEvent(
+          new CustomEvent(`move:${userId}`, { detail: { patches } }),
+        );
+        this.dispatchEvent(new CustomEvent("move"));
+      }
+    }
+    this.moveNum++;
   }
 
   serialize(): string {
-    const state = this.store.getState();
-    const {
-      players,
-      matchData,
-      gameData,
-      matchSettings,
-      matchPlayersSettings,
-    } = this;
-    return JSON.stringify({
-      state,
-      players,
-      matchData,
-      gameData,
-      // gameId,
-      matchSettings,
-      matchPlayersSettings,
-      version: VERSION,
-    });
+    const { store } = this;
+    return JSON.stringify({ store, version: VERSION });
   }
 
   static deserialize(str: string, game: Game_): Match {
     const obj = JSON.parse(str);
-    const {
-      state,
-      players,
-      matchData,
-      gameData,
-      matchSettings,
-      matchPlayersSettings,
-      locale,
-      version,
-    } = obj;
+    const { store, version } = obj;
 
     // Currently we don't even try to maintain backward compatiblity here.
     if (version !== VERSION) {
@@ -290,14 +231,8 @@ class Match extends EventTarget {
     }
 
     return new Match({
-      state,
-      players,
-      matchData,
-      gameData,
       game,
-      matchSettings,
-      matchPlayersSettings,
-      locale,
+      store,
     });
   }
 }
