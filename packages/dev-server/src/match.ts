@@ -42,9 +42,6 @@ class Match extends EventTarget {
   random: Random;
   game: Game_;
   store: MatchStore;
-  // We increment this on every move. Some parts of the UI watch this
-  // and refresh when it changes.
-  moveNum = 0;
 
   // Store that represents the DB.
   // We need to put it in a zustand Store because we want the JSON view in the right
@@ -213,7 +210,6 @@ class Match extends EventTarget {
         this.dispatchEvent(new CustomEvent("move"));
       }
     }
-    this.moveNum++;
   }
 
   serialize(): string {
