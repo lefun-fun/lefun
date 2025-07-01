@@ -11,7 +11,12 @@ import {
   UserId,
   UsersState,
 } from "@lefun/core";
-import { executePlayerMove, Game_, Random } from "@lefun/game";
+import {
+  executePlayerMove,
+  Game_,
+  MoveExecutionOutput,
+  Random,
+} from "@lefun/game";
 
 // This is what would normally go in a database.
 type MatchStore = {
@@ -26,26 +31,25 @@ type MatchStore = {
   matchPlayersSettings: MatchPlayersSettings;
   //
   users: UsersState;
+  //
+  // Simplified match statuses.
+  matchStatus: "started" | "over";
   // TODO Deal with stats
-  // matchStats: null;
-  // playerStats: null;
+  matchStats: { key: string; value: number }[];
+  playerStats: Record<UserId, { key: string; value: number }[]>;
   // delayedMoves: DelayedMove[];
 };
 
 // We increment this every time we make backward incompatible changes in the match
 // saved to local storage. We save this version with the match to later detect that
 // a saved match is too old.
-const VERSION = 3;
+const VERSION = 4;
 
 /* This class replaces our backend */
 class Match extends EventTarget {
   random: Random;
   game: Game_;
   store: MatchStore;
-
-  // Store that represents the DB.
-  // We need to put it in a zustand Store because we want the JSON view in the right
-  // panel to refresh with changes of state.
 
   constructor({
     game,
@@ -152,6 +156,10 @@ class Match extends EventTarget {
       gameData,
       //
       users,
+      //
+      matchStatus: "started",
+      matchStats: [],
+      playerStats: Object.fromEntries(userIds.map((userId) => [userId, []])),
     };
   }
 
@@ -161,20 +169,33 @@ class Match extends EventTarget {
     const { game, random, store } = this;
     const { meta, board, playerboards, secretboard, matchData, gameData } =
       store;
-    const result = executePlayerMove({
-      name: moveName,
-      payload,
-      game,
-      now,
-      userId,
-      board,
-      playerboards,
-      secretboard,
-      random,
-      meta,
-      matchData,
-      gameData,
-    });
+
+    let result: MoveExecutionOutput | null = null;
+    try {
+      result = executePlayerMove({
+        name: moveName,
+        payload,
+        game,
+        now,
+        userId,
+        board,
+        playerboards,
+        secretboard,
+        random,
+        meta,
+        matchData,
+        gameData,
+      });
+    } catch (e) {
+      console.error(
+        `Ignoring move "${moveName}" for user "${userId}" because of error`,
+      );
+      console.error(e);
+    }
+
+    if (result == null) {
+      return;
+    }
 
     // Update the store.
     {
@@ -208,6 +229,21 @@ class Match extends EventTarget {
           new CustomEvent(`move:${userId}`, { detail: { patches } }),
         );
         this.dispatchEvent(new CustomEvent("move"));
+      }
+    }
+
+    // Has the match ended?
+    if (result.matchHasEnded) {
+      this.store.matchStatus = "over";
+    }
+
+    // Are there any stats?
+    for (const stat of result.stats) {
+      const { key, value, userId } = stat;
+      if (userId) {
+        this.store.playerStats[userId].push({ key, value });
+      } else {
+        this.store.matchStats.push({ key, value });
       }
     }
   }

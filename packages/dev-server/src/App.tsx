@@ -4,12 +4,12 @@ import "./index.css";
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import classNames from "classnames";
-import { applyPatches, Draft, enablePatches, Patch, produce } from "immer";
+import { applyPatches, enablePatches, Patch, produce } from "immer";
 import { JsonEditor } from "json-edit-react";
 import { ReactNode, RefObject, useEffect, useRef, useState } from "react";
 import { createStore as _createStore } from "zustand";
 
-import type {
+import {
   GameId,
   GamePlayerSettings_,
   GameSetting,
@@ -18,7 +18,7 @@ import type {
   UserId,
   UsersState,
 } from "@lefun/core";
-import { MoveSideEffects } from "@lefun/game";
+import { executePlayerMove, MoveExecutionOutput } from "@lefun/game";
 import { setMakeMove, Store, storeContext } from "@lefun/ui";
 
 import { Match, saveMatchToLocalStorage } from "./match";
@@ -98,71 +98,44 @@ const BoardForPlayer = ({
       if (userId === "spectator") {
         return;
       }
-      const { canDo, executeNow } = match.game.playerMoves[moveName];
 
-      {
-        const now = new Date().getTime();
-        const { board, playerboard } = store.getState();
+      // Run the move locally for optimistic UI.
+      const { board, playerboard } = store.getState();
 
-        if (canDo) {
-          const canTheyDo = canDo({
-            userId,
-            board,
-            playerboard,
-            payload,
-            ts: now,
-          });
-          if (!canTheyDo) {
-            console.warn(`user ${userId} can not do move ${moveName}`);
-            return;
-          }
-        }
-      }
+      let result: MoveExecutionOutput | null = null;
 
-      const sideEffects: MoveSideEffects = {
-        delayMove() {
-          console.warn("delayMove not implemented yet");
-          return { ts: 0 };
-        },
-        endMatch() {
-          //
-        },
-        logPlayerStat() {
-          //
-        },
-        logMatchStat() {
-          //
-        },
-        turns: {
-          begin() {
-            console.warn("turns.begin not implemented");
-            return { expiresAt: 0 };
-          },
-          end() {
-            //
-          },
-        },
-      };
-
-      if (executeNow) {
-        // Optimistic update directly on the `store` of the player making the move.
-        store.setState((state: MatchState) => {
-          const newState = produce(state, (draft: Draft<MatchState>) => {
-            const { board, playerboard } = draft;
-            executeNow({
-              userId,
-              board,
-              playerboard,
-              payload,
-              _: sideEffects,
-              ...sideEffects,
-            });
-          });
-          return newState;
+      try {
+        result = executePlayerMove({
+          name: moveName,
+          payload,
+          game: match.game,
+          userId,
+          board,
+          playerboards: { [userId]: playerboard },
+          secretboard: null,
+          now: new Date().getTime(),
+          random: match.random,
+          skipCanDo: false,
+          onlyExecuteNow: true,
+          // Note that technically we should not use anything from
+          // `match.store` as this represents the DB.
+          matchData: match.store.matchData,
+          gameData: match.store.gameData,
+          meta: match.store.meta,
         });
+      } catch (e) {
+        console.error(
+          `Ignoring move "${moveName}" for user "${userId}" because of error`,
+        );
+        return;
       }
 
+      const { patches } = result;
+      store.setState((state: MatchState) => applyPatches(state, patches));
+
+      // Run the move in the backend also.
       match.makeMove(userId, moveName, payload);
+
       saveMatchToLocalStorage(match, gameId);
     });
 
@@ -216,6 +189,31 @@ function deepCopy<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
+const PlayerStats = ({ userId }: { userId: UserId }) => {
+  const stats = useStore(
+    (state) => state.match?.store.playerStats[userId] || [],
+  );
+  const username = useStore(
+    (state) => state.match?.store.users.byId[userId]?.username,
+  );
+
+  return (
+    <>
+      <div className="font-medium">
+        Stats for <span className="font-bold">{username}</span>
+      </div>
+      <div className="pl-2">
+        {stats.length === 0 && <span className="italic">No stats</span>}
+        {stats.map((stat, index) => (
+          <div key={index}>
+            {stat.key}: {stat.value}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+};
+
 function useSetDimensionCssVariablesOnResize(ref: RefObject<HTMLElement>) {
   const [height, setHeight] = useState(0);
   const [width, setWidth] = useState(0);
@@ -263,18 +261,19 @@ function MatchStateView() {
     }, [match]);
   }
 
-  const state = useStore((state) => state.match?.store);
+  const store = useStore((state) => state.match?.store);
 
-  if (!state) {
+  if (!store) {
     return <div>Loading match state...</div>;
   }
 
   return (
     <div className="">
+      {store.matchStatus || "no status"}
       {(["board", "playerboards", "secretboard"] as const).map((key) => (
         <JsonEditor
           key={key}
-          data={state[key] as any}
+          data={store[key] as any}
           collapse={2}
           rootName={key}
           restrictEdit={true}
@@ -282,6 +281,20 @@ function MatchStateView() {
           restrictAdd={true}
         />
       ))}
+      {store.meta.players.allIds.map((userId) => (
+        <PlayerStats userId={userId} key={userId} />
+      ))}
+      <div className="pt-4 font-bold">Match stats</div>
+      <div className="pl-2">
+        {store.matchStats.length === 0 && (
+          <span className="italic">No stats</span>
+        )}
+        {store.matchStats.map((stat, index) => (
+          <div key={index}>
+            {stat.key}: {stat.value}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

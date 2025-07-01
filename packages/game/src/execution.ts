@@ -80,7 +80,7 @@ function tryProduceWithPatches<T>(
   };
 }
 
-type MoveExecutionOutput = {
+export type MoveExecutionOutput = {
   board: unknown;
   playerboards: Record<UserId, unknown>;
   secretboard: unknown;
