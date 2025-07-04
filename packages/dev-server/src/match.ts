@@ -7,11 +7,14 @@ import {
   Meta,
   metaAddUserToMatch,
   metaInitialState,
+  metaSetTurns,
   User,
   UserId,
   UsersState,
 } from "@lefun/core";
 import {
+  DelayedMove,
+  executeBoardMove,
   executePlayerMove,
   Game_,
   MoveExecutionOutput,
@@ -34,10 +37,11 @@ type MatchStore = {
   //
   // Simplified match statuses.
   matchStatus: "started" | "over";
-  // TODO Deal with stats
   matchStats: { key: string; value: number }[];
   playerStats: Record<UserId, { key: string; value: number }[]>;
-  // delayedMoves: DelayedMove[];
+  // <id> => delayedMove
+  // We need an id to be able to remove them on execution.
+  delayedMoves: Record<string, DelayedMove>;
 };
 
 // We increment this every time we make backward incompatible changes in the match
@@ -45,11 +49,24 @@ type MatchStore = {
 // a saved match is too old.
 const VERSION = 4;
 
+// This could be improved...
+let _counter = 0;
+function generateId() {
+  return `${new Date().getTime()}-${_counter++}`;
+}
+
 /* This class replaces our backend */
 class Match extends EventTarget {
   random: Random;
   game: Game_;
   store: MatchStore;
+  // We note what user has an on expiry delayed move.
+  // This is necessary to be able to cancel these delayed move when a
+  // user's turn ends.
+  onExpiryDelayedMoves: Record<
+    UserId,
+    { timeout: ReturnType<typeof setTimeout>; delayedMoveId: string }
+  >;
 
   constructor({
     game,
@@ -95,10 +112,27 @@ class Match extends EventTarget {
     const random = new Random();
     this.random = random;
     this.game = game;
+    this.onExpiryDelayedMoves = {};
 
     // If a store is provided, there isn't much to do.
     if (store) {
       this.store = store;
+
+      // Start the timeouts for the delayed move.
+      for (const [delayedMoveId, delayedMove] of Object.entries(
+        store.delayedMoves,
+      )) {
+        const { userId, ts } = delayedMove;
+        // Those that happen on turn expiry.
+        const delay = ts - new Date().getTime();
+        const timeout = setTimeout(() => {
+          this._executeDelayedMove(delayedMoveId);
+        }, delay);
+        if (userId) {
+          this.onExpiryDelayedMoves[userId] = { timeout, delayedMoveId };
+        }
+      }
+
       return;
     }
 
@@ -144,6 +178,7 @@ class Match extends EventTarget {
 
     this.store = {
       meta,
+      users,
       //
       matchSettings,
       matchPlayersSettings,
@@ -155,15 +190,59 @@ class Match extends EventTarget {
       matchData,
       gameData,
       //
-      users,
-      //
       matchStatus: "started",
       matchStats: [],
       playerStats: Object.fromEntries(userIds.map((userId) => [userId, []])),
+      delayedMoves: {},
     };
   }
 
-  makeMove(userId: UserId, moveName: string, payload: any) {
+  _executeDelayedMove(delayedMoveId: string) {
+    const delayedMove = this.store.delayedMoves[delayedMoveId];
+
+    if (this.store.matchStatus === "over") {
+      console.warn(
+        `Ignoring delayed move "${delayedMoveId}" because match is over`,
+      );
+      this._removeDelayedMove(delayedMoveId);
+      // Force refresh of the list of delayed moves.
+      this.dispatchEvent(new CustomEvent("move"));
+      return;
+    }
+
+    if (!delayedMove) {
+      throw new Error(`Unknown move "${delayedMoveId}"`);
+    }
+
+    const { userId, payload, name, type } = delayedMove;
+
+    if (type === "playerMove") {
+      try {
+        this.makeMove(userId, name, payload);
+      } catch (e) {
+        console.error("error in delayed player move", e);
+      } finally {
+        this._removeDelayedMove(delayedMoveId);
+      }
+    } else if (type === "boardMove") {
+      try {
+        this.makeBoardMove(name, payload);
+      } catch (e) {
+        console.error("error in delayed board move", e);
+      } finally {
+        this._removeDelayedMove(delayedMoveId);
+      }
+    } else {
+      throw new Error(`Unknown delayed move type "${type}"`);
+    }
+  }
+
+  /* Both player and board moves */
+  _makeMove(moveName: string, payload: any, userId: UserId | null = null) {
+    if (this.store.matchStatus == "over") {
+      console.warn("match is over");
+      return;
+    }
     // Execute the move.
     const now = new Date().getTime();
     const { game, random, store } = this;
@@ -171,29 +250,52 @@ class Match extends EventTarget {
       store;
 
     let result: MoveExecutionOutput | null = null;
-    try {
-      result = executePlayerMove({
-        name: moveName,
-        payload,
-        game,
-        now,
-        userId,
-        board,
-        playerboards,
-        secretboard,
-        random,
-        meta,
-        matchData,
-        gameData,
-      });
-    } catch (e) {
-      console.error(
-        `Ignoring move "${moveName}" for user "${userId}" because of error`,
-      );
-      console.error(e);
+    if (userId) {
+      try {
+        result = executePlayerMove({
+          name: moveName,
+          payload,
+          game,
+          now,
+          userId,
+          board,
+          playerboards,
+          secretboard,
+          random,
+          meta,
+          matchData,
+          gameData,
+        });
+      } catch (e) {
+        console.error(
+          `Ignoring move "${moveName}" for user "${userId}" because of error`,
+        );
+        console.error(e);
+      }
+    } else {
+      try {
+        result = executeBoardMove({
+          name: moveName,
+          payload,
+          game,
+          now,
+          board,
+          playerboards,
+          secretboard,
+          random,
+          meta,
+          matchData,
+          gameData,
+        });
+      } catch (e) {
+        console.error(
+          `Ignoring move "${moveName}" for user "${userId}" because of error`,
+        );
+        console.error(e);
+      }
     }
 
-    if (result == null) {
+    if (!result) {
       return;
     }
 
@@ -226,10 +328,11 @@ class Match extends EventTarget {
           continue;
         }
         this.dispatchEvent(
-          new CustomEvent(`move:${userId}`, { detail: { patches } }),
+          new CustomEvent(`patches:${userId}`, { detail: { patches } }),
         );
-        this.dispatchEvent(new CustomEvent("move"));
       }
+      // This is for the dev server state view so that it knows it needs to update.
+      this.dispatchEvent(new CustomEvent("move"));
     }
 
     // Has the match ended?
@@ -246,14 +349,90 @@ class Match extends EventTarget {
         this.store.matchStats.push({ key, value });
       }
     }
+
+    // Turns
+    metaSetTurns({
+      meta,
+      userIds: Array.from(result.beginTurnUsers),
+      value: true,
+    });
+
+    metaSetTurns({
+      meta,
+      userIds: Array.from(result.endTurnUsers),
+      value: false,
+    });
+
+    if (result.beginTurnUsers.size > 0 || result.endTurnUsers.size > 0) {
+      this.dispatchEvent(new CustomEvent("metaChanged", { detail: { meta } }));
+    }
+
+    // Also cancel move expiry timeouts for users whose turn has ended.
+    for (const userId of result.endTurnUsers) {
+      this._removeDelayedMoveForUser(userId);
+    }
+
+    // Delayed moves
+    for (const delayedMove of result.delayedMoves) {
+      this._addDelayedMove(delayedMove);
+    }
   }
 
-  serialize(): string {
+  makeBoardMove(moveName: string, payload: any) {
+    console.warn("board move", moveName, payload);
+    return this._makeMove(moveName, payload, null);
+  }
+
+  makeMove(userId: UserId, moveName: string, payload: any) {
+    console.warn("move", moveName, payload, "by user", userId);
+    return this._makeMove(moveName, payload, userId);
+  }
+
+  _addDelayedMove(delayedMove: DelayedMove) {
+    const { userId, ts } = delayedMove;
+    const delayedMoveId = generateId();
+
+    this.store.delayedMoves[delayedMoveId] = delayedMove;
+
+    const timeout = setTimeout(() => {
+      this._executeDelayedMove(delayedMoveId);
+    }, ts - new Date().getTime());
+
+    if (userId) {
+      this.onExpiryDelayedMoves[userId] = { timeout, delayedMoveId };
+    }
+  }
+
+  /* Remove a delayed move from the state, for instance after its execution. */
+  _removeDelayedMove(delayedMoveId: string) {
+    this.store.delayedMoves[delayedMoveId];
+    // If it's a delayed move on expiry, we also remove the item in the per
+    // user object..
+    const userDelayedMove = this.onExpiryDelayedMoves[delayedMoveId];
+    if (userDelayedMove) {
+      const { timeout } = userDelayedMove;
+      clearTimeout(timeout);
+      delete this.onExpiryDelayedMoves[delayedMoveId];
+    }
+    delete this.store.delayedMoves[delayedMoveId];
+  }
+
+  _removeDelayedMoveForUser(userId: UserId) {
+    const userDelayedMove = this.onExpiryDelayedMoves[userId];
+    if (userDelayedMove) {
+      const { timeout, delayedMoveId } = userDelayedMove;
+      clearTimeout(timeout);
+      delete this.onExpiryDelayedMoves[userId];
+      delete this.store.delayedMoves[delayedMoveId];
+    }
+  }
+
+  _serialize(): string {
     const { store } = this;
     return JSON.stringify({ store, version: VERSION });
   }
 
-  static deserialize(str: string, game: Game_): Match {
+  static _deserialize(str: string, game: Game_): Match {
     const obj = JSON.parse(str);
     const { store, version } = obj;
 
@@ -305,23 +484,23 @@ export function separatePatchesByUser({
   }
 }
 
-function matchKey(gameId?: string) {
+function _matchKey(gameId?: string) {
   return `match${gameId ? `.${gameId}` : ""}`;
 }
 
 function saveMatchToLocalStorage(match: Match, gameId?: string) {
-  localStorage.setItem(matchKey(gameId), match.serialize());
+  localStorage.setItem(_matchKey(gameId), match._serialize());
 }
 
 function loadMatchFromLocalStorage(game: Game_, gameId?: string): Match | null {
-  const str = localStorage.getItem(matchKey(gameId));
+  const str = localStorage.getItem(_matchKey(gameId));
 
   if (!str) {
     return null;
   }
 
   try {
-    return Match.deserialize(str, game);
+    return Match._deserialize(str, game);
   } catch (e) {
     console.warn("Failed to deserialize match", e);
     return null;

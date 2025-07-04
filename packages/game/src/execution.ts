@@ -25,6 +25,7 @@ export type Stat = {
   userId?: UserId;
 };
 
+// These moves happen on turn expiration.
 type DelayedPlayerMove = {
   type: "playerMove";
   name: string;

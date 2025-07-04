@@ -5,7 +5,7 @@ import { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 
 import type { Locale, MatchPlayersSettings, MatchSettings } from "@lefun/core";
-import { Game, Game_, parseGame } from "@lefun/game";
+import { Game, Game_, INIT_MOVE, parseGame } from "@lefun/game";
 
 import { AllMessages, BoardForPlayer, Lefun, Main, RulesWrapper } from "./App";
 import {
@@ -221,8 +221,6 @@ async function render({
   } = {}) => {
     let match = store.getState().match;
 
-    console.log("num p", numPlayers);
-
     match = initMatch({
       game: game_,
       matchData,
@@ -243,6 +241,9 @@ async function render({
     saveMatchToLocalStorage(match, gameId);
 
     store.setState(() => ({ match }));
+
+    // Start the match with the first "INIT_MOVE" board move.
+    match.makeBoardMove(INIT_MOVE, {});
   };
 
   store.setState(() => ({ game: game_, resetMatch }));

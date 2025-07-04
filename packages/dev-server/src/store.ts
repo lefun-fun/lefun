@@ -5,7 +5,7 @@
 import { createContext, useContext } from "react";
 import { createStore as _createStore, useStore as _useStore } from "zustand";
 
-import type { Locale, UserId } from "@lefun/core";
+import type { Locale, Meta, UserId } from "@lefun/core";
 import { Game_ } from "@lefun/game";
 
 import type { Match } from "./match";
@@ -73,6 +73,9 @@ function createStore({ locales, game }: { locales: Locale[]; game: Game_ }) {
     view: "game",
     match: undefined,
     game,
+    //
+    meta: undefined,
+    //
     resetMatch: () => {
       // This is set in App.tsx
     },

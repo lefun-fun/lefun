@@ -3,7 +3,7 @@ import { expect, test } from "vitest";
 import { MatchTester as _MatchTester, MatchTesterOptions } from "@lefun/game";
 
 import { autoMove } from "./backend";
-import { G, game, GS } from "./game";
+import { G, game, GS, MATCH_DURATION, TURN_DURATION } from "./game";
 
 class MatchTester extends _MatchTester<GS, G> {
   constructor(options: Omit<MatchTesterOptions<GS, G>, "game" | "autoMove">) {
@@ -15,49 +15,39 @@ class MatchTester extends _MatchTester<GS, G> {
   }
 }
 
-test("sanity check", () => {
-  const match = new MatchTester({ numPlayers: 2 });
-  const { players } = match.board;
-
-  const userId = Object.keys(players)[0];
-
-  match.makeMove(userId, "roll");
-  match.makeMove(userId, "roll", {}, { canFail: true });
-  match.makeMove(userId, "moveWithArg", { someArg: "123" });
-  match.makeMove(userId, "moveWithArg", { someArg: "123" }, { canFail: true });
-
-  // Time has no passed yet
-  expect(match.board.lastSomeBoardMoveValue).toBeUndefined();
-
-  // Not enough time
-  match.fastForward(50);
-  expect(match.board.lastSomeBoardMoveValue).toBeUndefined();
-
-  // Enough time
-  match.fastForward(50);
-  expect(match.board.lastSomeBoardMoveValue).toEqual(3);
-});
-
-test("turns in tests", () => {
-  const match = new MatchTester({ numPlayers: 2 });
-
-  const [p0, p1] = match.board.playerOrder;
-
-  expect(match.meta.players.byId[p0].itsYourTurn).toBe(true);
-  expect(match.meta.players.byId[p1].itsYourTurn).toBe(false);
+test("happy path", () => {
+  const match = new MatchTester({ numPlayers: 3 });
+  const [p0, p1, p2] = match.board.playerOrder;
 
   match.makeMove(p0, "roll");
-  expect(match.meta.players.byId[p0].itsYourTurn).toBe(false);
-  expect(match.meta.players.byId[p1].itsYourTurn).toBe(true);
+  match.makeMove(p1, "roll");
+  match.makeMove(p2, "roll");
+  expect(() => match.makeMove(p1, "roll")).toThrowError("not your turn");
+  match.makeMove(p0, "roll");
+  match.makeMove(p1, "roll");
 
-  match.makeMove(p0, "moveWithArg", { someArg: "123" });
-  expect(match.meta.players.byId[p0].itsYourTurn).toBe(false);
-  expect(match.meta.players.byId[p1].itsYourTurn).toBe(true);
+  match.fastForward(TURN_DURATION);
+
+  expect(match.board.players[p2].isDead).toBe(true);
+  expect(match.board.currentPlayerIndex).toEqual(0);
+  match.makeMove(p0, "roll");
+  match.makeMove(p1, "roll");
+  match.fastForward(TURN_DURATION);
+  match.makeMove(p1, "roll");
+  match.makeMove(p1, "roll");
+  match.makeMove(p1, "roll");
+  expect(match.matchHasEnded).toBe(false);
+  match.fastForward(MATCH_DURATION - 2 * TURN_DURATION);
+  expect(match.matchHasEnded).toBe(true);
 });
+
+const _sleep = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 test("bots and turns", async () => {
   const match = new MatchTester({ numPlayers: 0, numBots: 2 });
-  await match.start();
-  expect(match.board.sum).toBeGreaterThanOrEqual(20);
+  await match.start({ max: 50 });
+  await _sleep(100);
+  match.fastForward(MATCH_DURATION);
   expect(match.matchHasEnded).toBe(true);
 });

@@ -23,7 +23,13 @@
         ]
       }
     ],
-    "simple-import-sort/exports": "error"
+    "simple-import-sort/exports": "error",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "varsIgnorePattern": "_"
+      }
+    ]
   },
   "parserOptions": {
     "sourceType": "module",
@@ -33,7 +39,7 @@
     {
       "files": ["*.jsx", "*.tsx"],
       "rules": {
-        "@typescript-eslint/explicit-module-boundary-types": ["off"]
+        "@typescript-eslint/explicit-module-boundary-types": "off"
       }
     }
   ],

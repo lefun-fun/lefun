@@ -575,7 +575,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     this.fastForward(0);
   }
 
-  async start() {
+  async start({ max = null }: { max?: number | null } = {}) {
     if (this._isPlaying) {
       throw new Error("already playing");
     }
@@ -597,12 +597,12 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
         }
       }
     }
-    await this.makeNextBotMove();
+    await this.makeNextBotMove({ max });
   }
 
   async makeNextBotMove({ max = null }: { max?: number | null } = {}) {
     if (!this._isPlaying) {
-      await this.start();
+      await this.start({ max });
       // Return because `start` calls makeNextBotMove.
       return;
     }
@@ -649,7 +649,8 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
         };
 
         if (autoMove) {
-          botMove = await autoMove(args);
+          // No await because currently `autoMove` is not async.
+          botMove = autoMove(args);
         } else if (agent) {
           botMove = await agent.getMove(args);
         } else {

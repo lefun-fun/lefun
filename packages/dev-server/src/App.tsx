@@ -75,7 +75,7 @@ const BoardForPlayer = ({
         }) satisfies MatchState,
     );
 
-    match.addEventListener(`move:${userId}`, (event: any) => {
+    match.addEventListener(`patches:${userId}`, (event: any) => {
       if (!event) {
         return;
       }
@@ -96,6 +96,11 @@ const BoardForPlayer = ({
 
     setMakeMove((store) => (moveName, payload) => {
       if (userId === "spectator") {
+        throw new Error("spectator cannot make moves");
+      }
+
+      if (match.store.matchStatus === "over") {
+        console.warn("match is over");
         return;
       }
 
@@ -124,7 +129,7 @@ const BoardForPlayer = ({
           meta: match.store.meta,
         });
       } catch (e) {
-        console.error(
+        console.warn(
           `Ignoring move "${moveName}" for user "${userId}" because of error`,
         );
         return;
@@ -293,6 +298,22 @@ function MatchStateView() {
           <div key={index}>
             {stat.key}: {stat.value}
           </div>
+        ))}
+      </div>
+      <div className="pt-4 font-bold">Delayed moves</div>
+      <div className="pl-2">
+        {Object.keys(store.delayedMoves).length === 0 && (
+          <div className="italic">No delayed moves</div>
+        )}
+        {Object.entries(store.delayedMoves).map(([id, delayedMove]) => (
+          <JsonEditor
+            key={id}
+            data={delayedMove as any}
+            rootName={""}
+            restrictEdit={true}
+            restrictDelete={true}
+            restrictAdd={true}
+          />
         ))}
       </div>
     </div>
@@ -675,6 +696,37 @@ function Settings() {
   );
 }
 
+const ItsMyTurn = ({ userId }: { userId: UserId }) => {
+  const match = useStore((state) => state.match);
+
+  const [itsMyTurn, setItsMyTurn] = useState(
+    () => match?.store.meta.players.byId[userId]?.itsYourTurn || false,
+  );
+
+  useEffect(() => {
+    if (!match || userId === "spectator") {
+      return;
+    }
+
+    const handler = (event: Event) => {
+      const { detail } = event as CustomEvent;
+      setItsMyTurn(detail.meta.players.byId[userId].itsYourTurn || false);
+    };
+    match.addEventListener("metaChanged", handler);
+
+    return () => match.removeEventListener("metaChanged", handler);
+  }, [match, userId]);
+
+  return (
+    <div
+      className={classNames(
+        "absolute inset-0 border",
+        itsMyTurn ? "border-red-600" : "border-black",
+      )}
+    ></div>
+  );
+};
+
 function PlayerIframe({ userId }: { userId: UserId }) {
   const locale = useStore((state) => state.locale);
   const ref = useRef<HTMLDivElement>(null);
@@ -686,10 +738,11 @@ function PlayerIframe({ userId }: { userId: UserId }) {
   return (
     <>
       <div
-        className="border border-black w-full flex-1 h-0 overflow-hidden relative z-0"
+        className={classNames("w-full flex-1 h-0 overflow-hidden relative z-0")}
         key={userId}
         ref={ref}
       >
+        <ItsMyTurn userId={userId} />
         <iframe
           className="z-0 absolute w-full h-full left-0 top-0"
           src={`${href}?u=${userId}&l=${locale}`}

@@ -2,6 +2,7 @@ import "./index.css";
 
 import { Trans } from "@lingui/macro";
 import classNames from "classnames";
+import { useEffect, useState } from "react";
 
 import type { UserId } from "@lefun/core";
 import {
@@ -12,7 +13,7 @@ import {
   useUsername,
 } from "@lefun/ui";
 
-import type { G, GS } from "./game";
+import { G, getCurrentPlayer, GS } from "./game";
 
 const useSelector = makeUseSelector<GS>();
 const useSelectorShallow = makeUseSelectorShallow<GS>();
@@ -26,13 +27,43 @@ function Player({ userId }: { userId: UserId }) {
     (state) => state.board.matchPlayersSettings[userId].color,
   );
 
+  const expiresAt = useSelector(
+    (state) => state.board.players[userId].expiresAt,
+  );
+
+  const isDead = useSelector((state) => state.board.players[userId].isDead);
+
   return (
     <div className="player">
-      <span className={classNames(itsMe && "bold", color)}>{username}</span>
+      <span className={classNames(itsMe && "bold", color)}>
+        {username} {isDead ? "💀" : "😊"}
+      </span>
       <Die userId={userId} />
+      Expires in: {expiresAt ? <CountDown ts={expiresAt} /> : ""}
     </div>
   );
 }
+
+const CountDown = ({ ts }: { ts: number | undefined | null }) => {
+  const [delta, setDelta] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!ts) {
+      return;
+    }
+    const i = setInterval(() => {
+      setDelta(Math.max(ts - new Date().getTime(), 0));
+    }, 100);
+
+    return () => clearInterval(i);
+  }, [ts]);
+
+  if (!ts) {
+    return null;
+  }
+
+  return <div>{delta}</div>;
+};
 
 function Die({ userId }: { userId: UserId }) {
   const diceValue = useSelector(
@@ -50,6 +81,11 @@ function Die({ userId }: { userId: UserId }) {
   );
 }
 
+const EndMatchCountDown = () => {
+  const endsAt = useSelector((state) => state.board.endsAt);
+  return <CountDown ts={endsAt} />;
+};
+
 function Board() {
   const makeMove = useMakeMove();
   const players = useSelectorShallow((state) =>
@@ -60,10 +96,18 @@ function Board() {
 
   const isPlayer = useIsPlayer();
 
+  const sum = useSelector((state) => state.board.sum);
+
+  const itsMyTurn = useSelector(
+    (state) => getCurrentPlayer(state.board) === state.userId,
+  );
+
   return (
     <div>
       <div>
         <Trans>The template game</Trans>
+        <div>Sum: {sum}</div>
+        <EndMatchCountDown />
         {Object.entries(matchSettings).map(([key, value]) => (
           <div key={key}>
             <span className="bold">{key}:</span> {value}
@@ -73,17 +117,20 @@ function Board() {
           <Player key={userId} userId={userId} />
         ))}
       </div>
+
       {isPlayer && (
         <>
-          <button onClick={() => makeMove("roll")}>
+          <button
+            className={classNames(!itsMyTurn && "disabled")}
+            onClick={() => makeMove("roll")}
+          >
             <Trans>Roll</Trans>
           </button>
           <button
-            onClick={() => {
-              makeMove("moveWithArg", { someArg: "123" });
-            }}
+            className={classNames(!itsMyTurn && "disabled")}
+            onClick={() => makeMove("pass")}
           >
-            Go
+            <Trans>Pass</Trans>
           </button>
         </>
       )}

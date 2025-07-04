@@ -6,46 +6,55 @@ import {
   GameStats,
   INIT_MOVE,
   PlayerMove,
+  Turns,
 } from "@lefun/game";
 
 type Player = {
   isRolling: boolean;
   diceValue?: number;
+  expiresAt?: number;
+  isDead: boolean;
 };
 
-export type Board = {
+export type B = {
   players: Record<UserId, Player>;
   playerOrder: UserId[];
   currentPlayerIndex: number;
 
   sum: number;
-  lastSomeBoardMoveValue?: number;
 
   matchSettings: Record<string, string>;
   matchPlayersSettings: Record<UserId, Record<string, string>>;
+
+  endsAt: number | null;
 };
 
-export type GS = GameState<Board>;
+export type GS = GameState<B>;
 
-type MoveWithArgPayload = { someArg: string };
-type BoardMoveWithArgPayload = { someArg: number };
+type KillPayload = { userId: UserId };
 
 export type PMT = {
   roll: null;
-  moveWithArg: MoveWithArgPayload;
+  pass: null;
 };
 
 export type BMT = {
-  someBoardMove: null;
-  someBoardMoveWithArgs: BoardMoveWithArgPayload;
+  kill: KillPayload;
+  endMatch: null;
 };
 
 const matchStats = [
-  { key: "patate", type: "integer" },
+  { key: "sumOnEnd", type: "integer" },
 ] as const satisfies GameStats;
 
 const playerStats = [
-  { key: "poil", type: "rank", determinesRank: true },
+  {
+    key: "iMadeTheLastRoll",
+    type: "boolean",
+    determinesRank: true,
+    ordering: "lowerIsBetter",
+  },
+  { key: "rollValue", type: "integer", determinesRank: true },
 ] as const satisfies GameStats;
 
 type PM<Payload = null> = PlayerMove<
@@ -57,52 +66,104 @@ type PM<Payload = null> = PlayerMove<
   typeof matchStats
 >;
 
-const moveWithArg: PM<MoveWithArgPayload> = {};
+export const getCurrentPlayer = (board: B) => {
+  const { currentPlayerIndex, playerOrder } = board;
+  return playerOrder[currentPlayerIndex];
+};
+
+export const TURN_DURATION = 3000;
+export const MATCH_DURATION = 10_000;
+
+const goToNextPlayerNow = ({
+  board,
+  turns,
+}: {
+  board: B;
+  turns: Turns<PMT, BMT>;
+}) => {
+  const { playerOrder, currentPlayerIndex } = board;
+
+  turns.end(getCurrentPlayer(board));
+
+  let nextPlayerIndex = currentPlayerIndex;
+  let nextPlayer = playerOrder[currentPlayerIndex];
+
+  for (const _ of playerOrder) {
+    nextPlayerIndex = (nextPlayerIndex + 1) % playerOrder.length;
+    nextPlayer = playerOrder[nextPlayerIndex];
+    if (!board.players[nextPlayer].isDead) {
+      break;
+    }
+  }
+
+  board.currentPlayerIndex = nextPlayerIndex;
+
+  turns.begin(nextPlayer, {
+    expiresIn: TURN_DURATION,
+    boardMoveOnExpire: ["kill", { userId: nextPlayer }],
+  });
+};
+
+const goToNextPlayer = ({ board, ts }: { board: B; ts: number }) => {
+  const nextPlayer = getCurrentPlayer(board);
+  board.players[nextPlayer].expiresAt = ts + TURN_DURATION;
+};
+
+const pass: PM = {
+  executeNow({ board, turns }) {
+    goToNextPlayerNow({ board, turns });
+  },
+  execute({ board, ts }) {
+    goToNextPlayer({ board, ts });
+  },
+};
 
 const roll: PM = {
   executeNow({ board, userId }) {
+    if (getCurrentPlayer(board) !== userId) {
+      throw new Error("not your turn!");
+    }
     board.players[userId].isRolling = true;
   },
-  execute({
-    board,
-    userId,
-    random,
-    delayMove,
-    turns,
-    logMatchStat,
-    logPlayerStat,
-    endMatch,
-  }) {
+  execute({ board, userId, random, ts, turns, _ }) {
+    board.players[userId].isRolling = false;
+
     const diceValue =
       board.matchPlayersSettings[userId].dieNumFaces === "6"
         ? random.d6()
         : random.dice(20);
-    board.players[userId].diceValue = diceValue;
-    board.players[userId].isRolling = false;
-    board.sum += diceValue;
 
-    delayMove("someBoardMove", 100);
-    delayMove("someBoardMoveWithArgs", { someArg: 3 }, 100);
+    board.players[userId].diceValue = diceValue;
+    board.sum = Object.values(board.players).reduce(
+      (sum, player) => sum + (player.diceValue || 0),
+      0,
+    );
 
     // Test those types here
-    logPlayerStat(userId, "poil", 1);
-    logMatchStat("patate", 1);
+    _.logPlayerStat(userId, "rollValue", diceValue);
 
     // If it was the player's turn, we go to the next player.
-    if (userId === board.playerOrder[board.currentPlayerIndex]) {
-      turns.end(userId);
-      board.currentPlayerIndex =
-        (board.currentPlayerIndex + 1) % board.playerOrder.length;
-      const nextPlayer = board.playerOrder[board.currentPlayerIndex];
-
-      turns.begin(nextPlayer, {
-        expiresIn: 60000,
-        playerMoveOnExpire: ["moveWithArg", { someArg: "0" }],
-      });
-    }
+    goToNextPlayerNow({ board, turns });
+    goToNextPlayer({ board, ts });
 
     if (board.sum >= 20) {
-      endMatch();
+      _.endMatch();
+      _.logMatchStat("sumOnEnd", board.sum);
+      _.logPlayerStat(userId, "iMadeTheLastRoll", 1);
+    }
+  },
+};
+
+const kill: BoardMove<GS, KillPayload, PMT, BMT> = {
+  execute({ board, payload, _, turns, ts }) {
+    const { userId } = payload;
+    board.players[userId].diceValue = undefined;
+    board.players[userId].isDead = true;
+    goToNextPlayerNow({ board, turns });
+    goToNextPlayer({ board, ts });
+
+    if (Object.values(board.players).every((p) => p.isDead)) {
+      _.endMatch();
     }
   },
 };
@@ -110,20 +171,21 @@ const roll: PM = {
 type BM<P = null> = BoardMove<GS, P, PMT, BMT>;
 
 const initMove: BM = {
-  execute({ board, turns }) {
-    turns.begin(board.playerOrder[0]);
+  execute({ board, _, ts }) {
+    _.turns.begin(board.playerOrder[0]);
+    _.delayMove("endMatch", MATCH_DURATION);
+    board.endsAt = ts + MATCH_DURATION;
   },
 };
 
-const someBoardMove: BM = {
-  execute() {
-    //
-  },
-};
+const endMatch: BM = {
+  execute({ board, _ }) {
+    for (const userId of board.playerOrder) {
+      board.players[userId].expiresAt = undefined;
+      board.players[userId].isDead = true;
+    }
 
-const someBoardMoveWithArgs: BM<BoardMoveWithArgPayload> = {
-  execute({ board, payload }) {
-    board.lastSomeBoardMoveValue = payload.someArg;
+    _.endMatch();
   },
 };
 
@@ -169,17 +231,21 @@ export const game = {
       board: {
         sum: 0,
         players: Object.fromEntries(
-          players.map((userId) => [userId, { isRolling: false }]),
+          players.map((userId) => [
+            userId,
+            { isRolling: false, isDead: false },
+          ]),
         ),
         playerOrder: [...players],
         currentPlayerIndex: 0,
         matchSettings,
         matchPlayersSettings,
+        endsAt: null,
       },
     };
   },
-  playerMoves: { roll, moveWithArg },
-  boardMoves: { [INIT_MOVE]: initMove, someBoardMove, someBoardMoveWithArgs },
+  playerMoves: { roll, pass },
+  boardMoves: { [INIT_MOVE]: initMove, kill, endMatch },
   minPlayers: 1,
   maxPlayers: 10,
   matchStats,

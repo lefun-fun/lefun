@@ -21,6 +21,10 @@ button {
   font-size: 1.5rem;
 }
 
+.disabled {
+  background-color: #ccc;
+}
+
 .bold {
   font-weight: bold;
 }
@@ -35,6 +39,7 @@ button {
   flex-direction: column;
   justify-content: center;
   height: 80px;
+  padding-top: 20px;
 }
 
 .red {

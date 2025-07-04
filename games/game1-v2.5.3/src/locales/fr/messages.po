@@ -15,6 +15,81 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: lefun
+msgid "lefun.settings.setting1.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.settings.setting1.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.settings.setting1.options.a.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.settings.setting1.options.a.shortLabel"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.settings.setting1.options.b.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.settings.setting1.options.b.shortLabel"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.settings.setting2.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.settings.setting2.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.settings.setting2.options.x.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.settings.setting2.options.x.shortLabel"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.settings.setting2.options.y.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.settings.setting2.options.y.shortLabel"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.playerSettings.dieNumFaces.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.playerSettings.dieNumFaces.options.6.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
+msgid "lefun.playerSettings.dieNumFaces.options.20.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: lefun
 msgid "lefun.name"
 msgstr "Roule"
 
@@ -37,6 +112,10 @@ msgstr ""
 #: lefun
 msgid "lefun.description"
 msgstr "Ce jeu n'est qu'un template."
+
+#: src/Board.tsx
+msgid "Pass"
+msgstr ""
 
 #: src/Board.tsx
 msgid "Roll"
