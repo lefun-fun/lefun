@@ -1,6 +1,6 @@
 {
   "name": "@lefun/game",
-  "version": "2.5.3",
+  "version": "2.6.0-alpha.0",
   "description": "Main dependency for writing game logic at https://lefun.fun.",
   "author": "Simon Lemieux",
   "repository": {
