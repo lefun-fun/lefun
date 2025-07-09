@@ -29,7 +29,12 @@ export type B = {
   endsAt: number | null;
 };
 
-export type GS = GameState<B>;
+export type PB = {
+  // At the moment this is only so that the playerboard is not empty.
+  lastRollAt: number | null;
+};
+
+export type GS = GameState<B, PB>;
 
 type KillPayload = { userId: UserId };
 
@@ -119,13 +124,17 @@ const pass: PM = {
 };
 
 const roll: PM = {
-  executeNow({ board, userId }) {
+  executeNow({ board, playerboard, userId }) {
     if (getCurrentPlayer(board) !== userId) {
       throw new Error("not your turn!");
     }
     board.players[userId].isRolling = true;
+
+    // Used for tests!
+    playerboard.lastRollAt = 0;
   },
-  execute({ board, userId, random, ts, turns, _ }) {
+  execute({ board, playerboards, userId, random, ts, turns, _ }) {
+    playerboards[userId].lastRollAt = ts;
     board.players[userId].isRolling = false;
 
     const diceValue =
@@ -171,10 +180,14 @@ const kill: BoardMove<GS, KillPayload, PMT, BMT> = {
 type BM<P = null> = BoardMove<GS, P, PMT, BMT>;
 
 const initMove: BM = {
-  execute({ board, _, ts }) {
+  execute({ board, playerboards, _, ts }) {
     _.turns.begin(board.playerOrder[0]);
     _.delayMove("endMatch", MATCH_DURATION);
     board.endsAt = ts + MATCH_DURATION;
+    for (const userId of board.playerOrder) {
+      // HACK
+      playerboards[userId].lastRollAt = ts;
+    }
   },
 };
 
@@ -242,6 +255,9 @@ export const game = {
         matchPlayersSettings,
         endsAt: null,
       },
+      playerboards: Object.fromEntries(
+        players.map((userId) => [userId, { lastRollAt: null }]),
+      ),
     };
   },
   playerMoves: { roll, pass },

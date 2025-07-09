@@ -9,7 +9,6 @@ import {
   makeUseMakeMove,
   makeUseSelector,
   makeUseSelectorShallow,
-  useIsPlayer,
   useUsername,
 } from "@lefun/ui";
 
@@ -22,6 +21,8 @@ const useMakeMove = makeUseMakeMove<G>();
 function Player({ userId }: { userId: UserId }) {
   const itsMe = useSelector((state) => state.userId === userId);
   const username = useUsername(userId);
+
+  const myLastRollAt = useSelector((state) => state.playerboard?.lastRollAt);
 
   const color = useSelector(
     (state) => state.board.matchPlayersSettings[userId].color,
@@ -40,6 +41,7 @@ function Player({ userId }: { userId: UserId }) {
       </span>
       <Die userId={userId} />
       Expires in: {expiresAt ? <CountDown ts={expiresAt} /> : ""}
+      {itsMe && myLastRollAt}
     </div>
   );
 }
@@ -94,8 +96,6 @@ function Board() {
 
   const matchSettings = useSelector((state) => state.board.matchSettings);
 
-  const isPlayer = useIsPlayer();
-
   const sum = useSelector((state) => state.board.sum);
 
   const itsMyTurn = useSelector(
@@ -118,22 +118,20 @@ function Board() {
         ))}
       </div>
 
-      {isPlayer && (
-        <>
-          <button
-            className={classNames(!itsMyTurn && "disabled")}
-            onClick={() => makeMove("roll")}
-          >
-            <Trans>Roll</Trans>
-          </button>
-          <button
-            className={classNames(!itsMyTurn && "disabled")}
-            onClick={() => makeMove("pass")}
-          >
-            <Trans>Pass</Trans>
-          </button>
-        </>
-      )}
+      <>
+        <button
+          className={classNames(!itsMyTurn && "disabled")}
+          onClick={() => makeMove("roll")}
+        >
+          <Trans>Roll</Trans>
+        </button>
+        <button
+          className={classNames(!itsMyTurn && "disabled")}
+          onClick={() => makeMove("pass")}
+        >
+          <Trans>Pass</Trans>
+        </button>
+      </>
     </div>
   );
 }

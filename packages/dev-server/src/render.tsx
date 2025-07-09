@@ -132,8 +132,8 @@ const initMatch = ({
 
 async function render({
   game,
-  board,
-  rules,
+  boardComponent,
+  rulesComponent,
   matchData,
   gameData,
   idName = "home",
@@ -141,8 +141,8 @@ async function render({
   gameId = "unknown-game-id",
 }: {
   game: Game;
-  board: () => Promise<ReactNode>;
-  rules?: () => Promise<ReactNode>;
+  boardComponent: () => Promise<() => ReactNode>;
+  rulesComponent?: () => Promise<() => ReactNode>;
   matchData?: any;
   gameData?: any;
   idName?: string;
@@ -162,12 +162,13 @@ async function render({
   const isRules = urlParams.get("v") === "rules";
 
   if (isRules) {
-    if (!rules) {
+    if (!rulesComponent) {
       return renderComponent(<div>Rules not defined</div>);
     }
+    const RulesComponent = await rulesComponent();
     return renderComponent(
       <RulesWrapper messages={messages[locale]} locale={locale}>
-        {await rules()}
+        <RulesComponent />
       </RulesWrapper>,
     );
   }
@@ -177,10 +178,11 @@ async function render({
   // Is it the player's board?
   if (userId !== null) {
     const match = ((window.top as any).lefun as Lefun).match;
+    const BoardComponent = await boardComponent();
     const content = (
       <BoardForPlayer
+        BoardComponent={BoardComponent}
         match={match}
-        board={await board()}
         userId={userId}
         messages={messages[locale]}
         locale={locale}

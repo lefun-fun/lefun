@@ -121,6 +121,8 @@ export type MoveSideEffects<
   logMatchStat: LogMatchStat<MS>;
 };
 
+// FIXME at `ts` in the options here. We should be able to pass a sensible value no?
+// This way we could at least get something optimistic if needed.
 type ExecuteNowOptions<
   GS extends GameStateBase,
   P,
@@ -368,6 +370,8 @@ export type InitialBoard<GS extends GameStateBase = GameStateBase> = (
   options: InitialBoardsOptions<GS["B"]>,
 ) => {
   board: GS["B"];
+  // FIXME here the playerboards field should be required if we provide a PB variable.
+  // This is probably doable with conditional types.
   playerboards?: Record<UserId, GS["PB"]>;
   secretboard?: GS["SB"];
 };

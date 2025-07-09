@@ -72,6 +72,7 @@
     "classnames": "^2.5.1",
     "immer": "^10.1.1",
     "json-edit-react": "^1.13.3",
+    "valtio": "^2.1.5",
     "zustand": "^4.5.4"
   },
   "postcss": {

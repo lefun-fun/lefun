@@ -4,10 +4,10 @@ import "./index.css";
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import classNames from "classnames";
-import { applyPatches, enablePatches, Patch, produce } from "immer";
+import { enablePatches, Patch } from "immer";
 import { JsonEditor } from "json-edit-react";
 import { ReactNode, RefObject, useEffect, useRef, useState } from "react";
-import { createStore as _createStore } from "zustand";
+import { proxy, snapshot, useSnapshot } from "valtio";
 
 import {
   GameId,
@@ -16,34 +16,55 @@ import {
   GameSettings_,
   Locale,
   UserId,
-  UsersState,
 } from "@lefun/core";
-import { executePlayerMove, MoveExecutionOutput } from "@lefun/game";
-import { setMakeMove, Store, storeContext } from "@lefun/ui";
+import {
+  executePlayerMove,
+  GameStateBase,
+  MoveExecutionOutput,
+} from "@lefun/game";
+import {
+  Selector,
+  setMakeMove,
+  setUseSelector,
+  setUseSelectorShallow,
+  setUseStore,
+  UseSelector,
+} from "@lefun/ui";
 
 import { Match, saveMatchToLocalStorage } from "./match";
+import { OptimisticBoards } from "./moves";
 import { useStore } from "./store";
+import { generateId } from "./utils";
 
 const LATENCY = 100;
 
 enablePatches();
 
-type MatchState = {
-  board: unknown;
-  playerboard: unknown;
-  userId: UserId;
-  users: UsersState;
+/* Change
+ *   path=playerboards/userId/xyz...
+ * to
+ *   path=playerboard/xyz...
+ *
+ * Note that we do the same thing in `match.ts`, these could be unified.
+ */
+const reformatPlayerboardPatch = (patch: Patch) => {
+  const { path } = patch;
+  const [p0, , ...rest] = path;
+  if (p0 === "playerboards") {
+    return { ...patch, path: ["playerboard", ...rest] };
+  }
+  return patch;
 };
 
 const BoardForPlayer = ({
-  board,
+  BoardComponent,
   match,
   userId,
   messages,
   locale,
   gameId,
 }: {
-  board: any;
+  BoardComponent: () => ReactNode;
   match: Match;
   userId: UserId | "spectator";
   messages: Record<string, string>;
@@ -55,46 +76,42 @@ const BoardForPlayer = ({
   }, [locale, messages]);
 
   const [loading, setLoading] = useState(true);
-  const storeRef = useRef<Store | null>(null);
+  // const storeRef = useRef<Store | null>(null);
+
+  // Here we use `valtio` as a test to see how well it works as a local state
+  // management solution.
+  const optimisticBoards = useRef(
+    proxy(
+      new OptimisticBoards({
+        board: match.store.board,
+        playerboard: match.store.playerboards[userId],
+      }),
+    ),
+  );
 
   useEffect(() => {
     const { store: mainStore } = match;
     const { users } = mainStore;
-    const { board, playerboards } = mainStore; //.getState();
-
-    // We create a local store with the player's boards.
-    // We'll update this local store when we receive updates from the "main" match.
-    const store = _createStore(
-      () =>
-        ({
-          userId,
-          board: deepCopy(board),
-          playerboard:
-            userId === "spectator" ? undefined : deepCopy(playerboards[userId]),
-          users,
-        }) satisfies MatchState,
-    );
 
     match.addEventListener(`patches:${userId}`, (event: any) => {
       if (!event) {
         return;
       }
 
-      let patches: Patch[] = [];
-      ({ patches } = event.detail);
+      const { moveId, patches } = event.detail;
 
       // Wait before we apply the updates to simulate a network latency.
       setTimeout(() => {
-        store.setState((state: MatchState) => {
-          const newState = produce(state, (draft) => {
-            applyPatches(draft, patches);
-          });
-          return newState;
-        });
+        optimisticBoards.current.confirmMove({ moveId, patches });
       }, LATENCY);
     });
 
-    setMakeMove((store) => (moveName, payload) => {
+    match.addEventListener("revertMove", (event: any) => {
+      const { moveId } = event.detail;
+      optimisticBoards.current.revertMove(moveId);
+    });
+
+    setMakeMove((moveName, payload) => {
       if (userId === "spectator") {
         throw new Error("spectator cannot make moves");
       }
@@ -104,9 +121,6 @@ const BoardForPlayer = ({
         return;
       }
 
-      // Run the move locally for optimistic UI.
-      const { board, playerboard } = store.getState();
-
       let result: MoveExecutionOutput | null = null;
 
       try {
@@ -115,8 +129,8 @@ const BoardForPlayer = ({
           payload,
           game: match.game,
           userId,
-          board,
-          playerboards: { [userId]: playerboard },
+          board: optimisticBoards.current.board,
+          playerboards: { [userId]: optimisticBoards.current.playerboard },
           secretboard: null,
           now: new Date().getTime(),
           random: match.random,
@@ -124,8 +138,8 @@ const BoardForPlayer = ({
           onlyExecuteNow: true,
           // Note that technically we should not use anything from
           // `match.store` as this represents the DB.
-          matchData: match.store.matchData,
           gameData: match.store.gameData,
+          matchData: match.store.matchData,
           meta: match.store.meta,
         });
       } catch (e) {
@@ -135,16 +149,44 @@ const BoardForPlayer = ({
         return;
       }
 
-      const { patches } = result;
-      store.setState((state: MatchState) => applyPatches(state, patches));
+      let { patches } = result;
+      patches = patches.map(reformatPlayerboardPatch);
+
+      const moveId = generateId();
+      optimisticBoards.current.addMove(moveId, patches);
 
       // Run the move in the backend also.
-      match.makeMove(userId, moveName, payload);
+      match.makeMove({ userId, moveName, payload, moveId });
 
       saveMatchToLocalStorage(match, gameId);
     });
 
-    storeRef.current = store;
+    const _useSelector = (): UseSelector => {
+      const useSelector = <GS extends GameStateBase, T>(
+        selector: Selector<GS, T>,
+      ): T => {
+        const snapshot = useSnapshot(optimisticBoards.current);
+        const board = snapshot.board;
+        const playerboard = snapshot.playerboard;
+        return selector({ board, playerboard, users, userId });
+      };
+      return useSelector;
+    };
+
+    setUseSelector(_useSelector);
+
+    setUseStore(() => {
+      return {
+        board: snapshot(optimisticBoards.current.board),
+        playerboard: snapshot(optimisticBoards.current.playerboard),
+        userId,
+        users: mainStore.users,
+      };
+    });
+
+    // As far as I know, valtio does not support shallow selectors.
+    setUseSelectorShallow(_useSelector);
+
     setLoading(false);
   }, [userId, match, gameId]);
 
@@ -155,9 +197,7 @@ const BoardForPlayer = ({
   return (
     <I18nProvider i18n={i18n}>
       <div style={{ height: "100%", width: "100%" }}>
-        <storeContext.Provider value={storeRef.current}>
-          {board}
-        </storeContext.Provider>
+        <BoardComponent />
       </div>
     </I18nProvider>
   );
@@ -181,17 +221,6 @@ function RulesWrapper({
       <div style={{ height: "100%", width: "100%" }}>{children}</div>
     </I18nProvider>
   );
-}
-
-/*
- * Deep copy an object.
- */
-function deepCopy<T>(obj: T): T {
-  if (obj === undefined) {
-    return obj;
-  }
-
-  return JSON.parse(JSON.stringify(obj));
 }
 
 const PlayerStats = ({ userId }: { userId: UserId }) => {
@@ -708,9 +737,8 @@ const ItsMyTurn = ({ userId }: { userId: UserId }) => {
       return;
     }
 
-    const handler = (event: Event) => {
-      const { detail } = event as CustomEvent;
-      setItsMyTurn(detail.meta.players.byId[userId].itsYourTurn || false);
+    const handler = () => {
+      setItsMyTurn(match?.store.meta.players.byId[userId].itsYourTurn || false);
     };
     match.addEventListener("metaChanged", handler);
 
@@ -720,8 +748,9 @@ const ItsMyTurn = ({ userId }: { userId: UserId }) => {
   return (
     <div
       className={classNames(
-        "absolute inset-0 border",
-        itsMyTurn ? "border-red-600" : "border-black",
+        "pointer-events-none",
+        "absolute inset-0 z-50 border-4",
+        itsMyTurn ? "border-red-600" : "border-gray-300",
       )}
     ></div>
   );
@@ -744,7 +773,7 @@ function PlayerIframe({ userId }: { userId: UserId }) {
       >
         <ItsMyTurn userId={userId} />
         <iframe
-          className="z-0 absolute w-full h-full left-0 top-0"
+          className="z-0 absolute w-full h-full inset-1"
           src={`${href}?u=${userId}&l=${locale}`}
           key={key}
         ></iframe>
