@@ -28,6 +28,7 @@ import {
   GetAgent,
   GetPayload,
   INIT_MOVE,
+  InitialBoardsOutput,
   KICK_PLAYER,
   MATCH_WAS_ABORTED,
   parseBotMove,
@@ -246,7 +247,11 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
       ts: time,
     });
 
-    const { board, playerboards = {}, secretboard = {} as GS["SB"] } = init;
+    const {
+      board,
+      playerboards = {},
+      secretboard = {},
+    } = init as InitialBoardsOutput<GameStateBase>;
 
     const users: UsersState = { byId: {} };
     meta.players.allIds.forEach((userId) => {

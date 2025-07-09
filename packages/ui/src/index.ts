@@ -1,6 +1,4 @@
-import { createContext, useContext, useMemo } from "react";
-import { StoreApi, useStore as _useStore } from "zustand";
-import { useShallow } from "zustand/react/shallow";
+import { useMemo } from "react";
 
 import type { IfAnyNull, MatchState as _MatchState, UserId } from "@lefun/core";
 import type { Game, GameStateBase, GetPayload } from "@lefun/game";
@@ -21,13 +19,9 @@ export type Selector<GS extends GameStateBase, T> = (
   state: MatchState<GS>,
 ) => T;
 
-export type Store<GS extends GameStateBase = GameStateBase> = StoreApi<
-  MatchState<GS>
->;
-
-export const storeContext = createContext<Store | null>(null);
-
-type MakeMove<G extends Game> = <K extends keyof G["playerMoves"] & string>(
+export type MakeMove<G extends Game> = <
+  K extends keyof G["playerMoves"] & string,
+>(
   moveName: K,
   ...payload: IfAnyNull<
     GetPayload<G, K>,
@@ -45,40 +39,72 @@ type MakeMoveFull<G extends Game> = <K extends keyof G["playerMoves"] & string>(
   payload: GetPayload<G, K>,
 ) => void;
 
-let _makeMove: (<G extends Game>(store: Store) => MakeMoveFull<G>) | null =
-  null;
+let _makeMove: MakeMoveFull<Game> | null = null;
 
-export function setMakeMove(
-  makeMove: <G extends Game>(store: Store) => MakeMoveFull<G>,
-) {
+export function setMakeMove(makeMove: MakeMoveFull<Game>) {
   _makeMove = makeMove;
 }
 
-type GetGameStatesFromGame<G extends Game> =
-  G extends Game<infer GS> ? GS : never;
+export type UseSelector = <GS extends GameStateBase, T>(
+  selector: Selector<GS, T>,
+) => T;
+
+let _useSelector: UseSelector | null = null;
+let _useSelectorShallow: UseSelector | null = null;
+
+export function setUseSelector(arg0: () => UseSelector) {
+  _useSelector = arg0();
+}
+
+export function setUseSelectorShallow(arg0: () => UseSelector) {
+  _useSelectorShallow = arg0();
+}
+
+/*
+ * Main way to get data from the match state.
+ */
+export function useSelector<GS extends GameStateBase, T>(
+  selector: Selector<GS, T>,
+): T {
+  if (_useSelector === null) {
+    throw new Error(
+      `"useSelector" not defined by the host. Did you forget to call \`setUseSelector\`?`,
+    );
+  }
+  return _useSelector(selector);
+}
+
+export function useSelectorShallow<GS extends GameStateBase, T>(
+  selector: Selector<GS, T>,
+): T {
+  if (_useSelectorShallow === null) {
+    throw new Error(
+      `"useShallowSelector" not defined by the host. Did you forget to call \`setUseShallowSelector\`?`,
+    );
+  }
+  return _useSelectorShallow(selector);
+}
+
+/* Util to "curry" the types of useSelector<...> */
+export const makeUseSelector =
+  <GS extends GameStateBase>() =>
+  <T>(selector: Selector<GS, T>) =>
+    useSelector<GS, T>(selector);
+
+export const makeUseSelectorShallow =
+  <GS extends GameStateBase>() =>
+  <T>(selector: Selector<GS, T>) =>
+    useSelectorShallow<GS, T>(selector);
 
 export function useMakeMove<G extends Game = Game>(): MakeMove<G> {
-  const makeMove = _makeMove;
-
-  if (!makeMove) {
+  if (!_makeMove) {
     throw new Error(
       '"makeMove" not defined by the host. Did you forget to call `setMakeMove`?',
     );
   }
-  const store: Store<GetGameStatesFromGame<G>> | null =
-    useContext(storeContext);
-
-  if (store === null) {
-    throw new Error(
-      "Store is not defined, did you forget <storeContext.Provider>?",
-    );
-  }
-
   // `_makeMove` returns a new function every time it's called, but we don't want to
   // re-render.
   return useMemo(() => {
-    const makeMovefull = makeMove<G>(store);
-
     function newMakeMove<K extends keyof G["playerMoves"] & string>(
       moveName: K,
       ...payload: IfAnyNull<
@@ -88,50 +114,20 @@ export function useMakeMove<G extends Game = Game>(): MakeMove<G> {
         [GetPayload<G, K>]
       >
     ) {
-      return makeMovefull(moveName, payload[0] || null);
+      if (!_makeMove) {
+        throw new Error(
+          '"makeMove" not defined by the host. Did you forget to call `setMakeMove`?',
+        );
+      }
+      return _makeMove(moveName, payload[0] || null);
     }
 
     return newMakeMove;
-  }, [store, makeMove]);
+  }, []);
 }
 
 export function makeUseMakeMove<G extends Game>() {
   return useMakeMove<G>;
-}
-
-/*
- * Main way to get data from the match state.
- */
-export function useSelector<GS extends GameStateBase, T>(
-  selector: Selector<GS, T>,
-): T {
-  const store = useContext(storeContext);
-  if (store === null) {
-    throw new Error("Store is `null`, did you forget <storeContext.Provider>?");
-  }
-  return _useStore(store, selector);
-}
-
-/* Util to "curry" the types of useSelector<...> */
-export const makeUseSelector =
-  <GS extends GameStateBase>() =>
-  <T>(selector: Selector<GS, T>) =>
-    useSelector<GS, T>(selector);
-
-/* Util to "curry" the types of useSelectorShallow<...> */
-export const makeUseSelectorShallow =
-  <GS extends GameStateBase>() =>
-  <T>(selector: Selector<GS, T>) =>
-    useSelectorShallow<GS, T>(selector);
-
-/*
- * Same as `useSelector` but will use a shallow equal on the output to decide if a render
- * is required or not.
- */
-export function useSelectorShallow<GS extends GameStateBase, T>(
-  selector: Selector<GS, T>,
-): T {
-  return useSelector(useShallow(selector));
 }
 
 /*
@@ -151,7 +147,7 @@ type TimeAdjust = "none" | "after" | "before";
 
 const toClientTime =
   (delta: number, latency: number) =>
-  (tsNumOrDate: number | Date, adjust: TimeAdjust = "none"): number => {
+  (tsNumOrDate: number | Date, adjust: TimeAdjust = "before"): number => {
     let ts: number;
     if (typeof tsNumOrDate !== "number") {
       ts = tsNumOrDate.getTime();
@@ -264,6 +260,23 @@ export const useMyUserId = () => {
   return useSelector((state) => state.userId);
 };
 
+// This has an awkward API for backward compatibility reasons.
+export type _Store<GS extends GameStateBase> = {
+  getState(): MatchState<GS>;
+};
+
+export type UseStore<GS extends GameStateBase = GameStateBase> = _Store<GS>;
+
+let _useStore: UseStore | null = null;
+
+export const setUseStore = (arg0: () => MatchState) => {
+  _useStore = {
+    getState() {
+      return arg0();
+    },
+  };
+};
+
 /* Return the store object.
  *
  * This is useful to access the state without subscribing to changes:
@@ -272,12 +285,15 @@ export const useMyUserId = () => {
  * const x = store.getState().board.x
  * ```
  * */
-export function useStore<GS extends GameStateBase>() {
-  const store = useContext(storeContext) as Store<GS>;
-  if (store === null) {
-    throw new Error("Store is `null`, did you forget <storeContext.Provider>?");
+export function useStore<
+  GS extends GameStateBase = GameStateBase,
+>(): _Store<GS> {
+  if (_useStore === null) {
+    throw new Error(
+      '"useStore" not defined by the host. Did you forget to call `setUseStore`?',
+    );
   }
-  return store;
+  return _useStore;
 }
 
 /* Convenience function to get a typed `useStore` hook. */

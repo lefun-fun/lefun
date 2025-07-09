@@ -9,7 +9,6 @@ import {
   makeUseMakeMove,
   makeUseSelector,
   makeUseSelectorShallow,
-  useIsPlayer,
   useUsername,
 } from "@lefun/ui";
 
@@ -22,6 +21,8 @@ const useMakeMove = makeUseMakeMove<G>();
 function Player({ userId }: { userId: UserId }) {
   const itsMe = useSelector((state) => state.userId === userId);
   const username = useUsername(userId);
+
+  const myLastRollAt = useSelector((state) => state.playerboard?.lastRollAt);
 
   const color = useSelector(
     (state) => state.board.matchPlayersSettings[userId].color,
@@ -40,6 +41,7 @@ function Player({ userId }: { userId: UserId }) {
       </span>
       <Die userId={userId} />
       Expires in: {expiresAt ? <CountDown ts={expiresAt} /> : ""}
+      {itsMe && myLastRollAt}
     </div>
   );
 }
@@ -94,8 +96,6 @@ function Board() {
 
   const matchSettings = useSelector((state) => state.board.matchSettings);
 
-  const isPlayer = useIsPlayer();
-
   const sum = useSelector((state) => state.board.sum);
 
   const itsMyTurn = useSelector(
@@ -103,22 +103,22 @@ function Board() {
   );
 
   return (
-    <div>
-      <div>
-        <Trans>The template game</Trans>
-        <div>Sum: {sum}</div>
-        <EndMatchCountDown />
-        {Object.entries(matchSettings).map(([key, value]) => (
-          <div key={key}>
-            <span className="bold">{key}:</span> {value}
-          </div>
-        ))}
-        {players.map((userId) => (
-          <Player key={userId} userId={userId} />
-        ))}
-      </div>
+    <div className="outer">
+      <div className="inner">
+        <div>
+          <Trans>The template game</Trans>
+          <div>Sum: {sum}</div>
+          <EndMatchCountDown />
+          {Object.entries(matchSettings).map(([key, value]) => (
+            <div key={key}>
+              <span className="bold">{key}:</span> {value}
+            </div>
+          ))}
+          {players.map((userId) => (
+            <Player key={userId} userId={userId} />
+          ))}
+        </div>
 
-      {isPlayer && (
         <>
           <button
             className={classNames(!itsMyTurn && "disabled")}
@@ -133,7 +133,7 @@ function Board() {
             <Trans>Pass</Trans>
           </button>
         </>
-      )}
+      </div>
     </div>
   );
 }

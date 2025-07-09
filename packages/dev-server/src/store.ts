@@ -5,7 +5,7 @@
 import { createContext, useContext } from "react";
 import { createStore as _createStore, useStore as _useStore } from "zustand";
 
-import type { Locale, Meta, UserId } from "@lefun/core";
+import type { Locale, UserId } from "@lefun/core";
 import { Game_ } from "@lefun/game";
 
 import type { Match } from "./match";

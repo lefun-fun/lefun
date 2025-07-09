@@ -29,7 +29,12 @@ export type B = {
   endsAt: number | null;
 };
 
-export type GS = GameState<B>;
+export type PB = {
+  // At the moment this is only so that the playerboard is not empty.
+  lastRollAt: number | null;
+};
+
+export type GS = GameState<B, PB>;
 
 type KillPayload = { userId: UserId };
 
@@ -125,7 +130,8 @@ const roll: PM = {
     }
     board.players[userId].isRolling = true;
   },
-  execute({ board, userId, random, ts, turns, _ }) {
+  execute({ board, playerboards, userId, random, ts, turns, _ }) {
+    playerboards[userId].lastRollAt = ts;
     board.players[userId].isRolling = false;
 
     const diceValue =
@@ -242,6 +248,9 @@ export const game = {
         matchPlayersSettings,
         endsAt: null,
       },
+      playerboards: Object.fromEntries(
+        players.map((userId) => [userId, { lastRollAt: null }]),
+      ),
     };
   },
   playerMoves: { roll, pass },

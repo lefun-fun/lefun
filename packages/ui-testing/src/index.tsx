@@ -2,9 +2,14 @@ import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { render as rtlRender, RenderResult } from "@testing-library/react";
 import { ElementType, ReactNode } from "react";
-import { createStore } from "zustand";
 
-import { MatchState, setMakeMove, storeContext } from "@lefun/ui";
+import {
+  MatchState,
+  setMakeMove,
+  setUseSelector,
+  setUseSelectorShallow,
+  setUseStore,
+} from "@lefun/ui";
 
 export function render(
   Board: ElementType,
@@ -17,12 +22,16 @@ export function render(
     throw new Error("userId should not be null");
   }
 
-  const store = createStore<MatchState>()(() => ({
-    ...state,
-  }));
-
   // Simply create a store that always use our `state.
-  setMakeMove(() => () => {});
+  setMakeMove(() => {});
+  setUseSelector(() => (selector) => {
+    return selector(state);
+  });
+  setUseSelectorShallow(() => (selector) => {
+    return selector(state);
+  });
+
+  setUseStore(() => state);
 
   i18n.loadAndActivate({
     locale,
@@ -31,11 +40,7 @@ export function render(
   });
 
   const wrapper = ({ children }: { children: ReactNode }) => {
-    return (
-      <storeContext.Provider value={store}>
-        <I18nProvider i18n={i18n}>{children}</I18nProvider>
-      </storeContext.Provider>
-    );
+    return <I18nProvider i18n={i18n}>{children}</I18nProvider>;
   };
   return rtlRender(<Board userId={userId} />, { wrapper });
 }
