@@ -21,6 +21,8 @@ import {
   Random,
 } from "@lefun/game";
 
+import { generateId } from "./utils";
+
 // This is what would normally go in a database.
 type MatchStore = {
   board: unknown;
@@ -47,13 +49,7 @@ type MatchStore = {
 // We increment this every time we make backward incompatible changes in the match
 // saved to local storage. We save this version with the match to later detect that
 // a saved match is too old.
-const VERSION = 4;
-
-// This could be improved...
-let _counter = 0;
-function generateId() {
-  return `${new Date().getTime()}-${_counter++}`;
-}
+const VERSION = 5;
 
 /* This class replaces our backend */
 class Match extends EventTarget {
@@ -218,7 +214,7 @@ class Match extends EventTarget {
 
     if (type === "playerMove") {
       try {
-        this.makeMove(userId, name, payload);
+        this.makeMove({ userId, moveName: name, payload });
       } catch (e) {
         console.error("error in delayed player move", e);
       } finally {
@@ -238,10 +234,14 @@ class Match extends EventTarget {
   }
 
   /* Both player and board moves */
-  _makeMove(moveName: string, payload: any, userId: UserId | null = null) {
+  _makeMove(
+    moveName: string,
+    payload: any,
+    userId: UserId | null = null,
+    moveId?: string,
+  ) {
     if (this.store.matchStatus == "over") {
-      console.warn("match is over");
-      return;
+      throw new Error("match is over");
     }
     // Execute the move.
     const now = new Date().getTime();
@@ -251,52 +251,38 @@ class Match extends EventTarget {
 
     let result: MoveExecutionOutput | null = null;
     if (userId) {
-      try {
-        result = executePlayerMove({
-          name: moveName,
-          payload,
-          game,
-          now,
-          userId,
-          board,
-          playerboards,
-          secretboard,
-          random,
-          meta,
-          matchData,
-          gameData,
-        });
-      } catch (e) {
-        console.error(
-          `Ignoring move "${moveName}" for user "${userId}" because of error`,
-        );
-        console.error(e);
-      }
+      result = executePlayerMove({
+        name: moveName,
+        payload,
+        game,
+        now,
+        userId,
+        board,
+        playerboards,
+        secretboard,
+        random,
+        meta,
+        matchData,
+        gameData,
+      });
     } else {
-      try {
-        result = executeBoardMove({
-          name: moveName,
-          payload,
-          game,
-          now,
-          board,
-          playerboards,
-          secretboard,
-          random,
-          meta,
-          matchData,
-          gameData,
-        });
-      } catch (e) {
-        console.error(
-          `Ignoring move "${moveName}" for user "${userId}" because of error`,
-        );
-        console.error(e);
-      }
+      result = executeBoardMove({
+        name: moveName,
+        payload,
+        game,
+        now,
+        board,
+        playerboards,
+        secretboard,
+        random,
+        meta,
+        matchData,
+        gameData,
+      });
     }
 
     if (!result) {
-      return;
+      throw new Error("bug");
     }
 
     // Update the store.
@@ -328,7 +314,7 @@ class Match extends EventTarget {
           continue;
         }
         this.dispatchEvent(
-          new CustomEvent(`patches:${userId}`, { detail: { patches } }),
+          new CustomEvent(`patches:${userId}`, { detail: { moveId, patches } }),
         );
       }
       // This is for the dev server state view so that it knows it needs to update.
@@ -364,11 +350,16 @@ class Match extends EventTarget {
     });
 
     if (result.beginTurnUsers.size > 0 || result.endTurnUsers.size > 0) {
-      this.dispatchEvent(new CustomEvent("metaChanged", { detail: { meta } }));
+      this.dispatchEvent(new CustomEvent("metaChanged"));
     }
 
     // Also cancel move expiry timeouts for users whose turn has ended.
     for (const userId of result.endTurnUsers) {
+      this._removeDelayedMoveForUser(userId);
+    }
+
+    // FIXME make sure we do the same in prod.
+    for (const userId of result.beginTurnUsers) {
       this._removeDelayedMoveForUser(userId);
     }
 
@@ -380,12 +371,27 @@ class Match extends EventTarget {
 
   makeBoardMove(moveName: string, payload: any) {
     console.warn("board move", moveName, payload);
-    return this._makeMove(moveName, payload, null);
+    this._makeMove(moveName, payload, null);
   }
 
-  makeMove(userId: UserId, moveName: string, payload: any) {
+  makeMove({
+    userId,
+    moveName,
+    payload,
+    moveId,
+  }: {
+    userId: UserId;
+    moveName: string;
+    payload: any;
+    moveId?: string;
+  }) {
     console.warn("move", moveName, payload, "by user", userId);
-    return this._makeMove(moveName, payload, userId);
+    try {
+      this._makeMove(moveName, payload, userId, moveId);
+    } catch (e) {
+      console.error("There was an error executing move", moveName, e);
+      this.dispatchEvent(new CustomEvent("revertMove", { detail: { moveId } }));
+    }
   }
 
   _addDelayedMove(delayedMove: DelayedMove) {
@@ -399,6 +405,9 @@ class Match extends EventTarget {
     }, ts - new Date().getTime());
 
     if (userId) {
+      // Remove any previous delayed move for this user.
+      this._removeDelayedMoveForUser(userId);
+      // FIXME go do this in prod also I don't think we do it there. ^^^
       this.onExpiryDelayedMoves[userId] = { timeout, delayedMoveId };
     }
   }
