@@ -8,16 +8,14 @@ import type { UserId } from "@lefun/core";
 import {
   makeUseMakeMove,
   makeUseSelector,
-  // makeUseSelectorShallow,
+  makeUseSelectorShallow,
   useUsername,
 } from "@lefun/ui";
 
 import { G, getCurrentPlayer, GS } from "./game";
 
 const useSelector = makeUseSelector<GS>();
-// const useSelectorShallow = makeUseSelectorShallow<GS>();
-// FIXME
-const useSelectorShallow = makeUseSelector<GS>();
+const useSelectorShallow = makeUseSelectorShallow<GS>();
 const useMakeMove = makeUseMakeMove<G>();
 
 function Player({ userId }: { userId: UserId }) {
@@ -43,7 +41,7 @@ function Player({ userId }: { userId: UserId }) {
       </span>
       <Die userId={userId} />
       Expires in: {expiresAt ? <CountDown ts={expiresAt} /> : ""}
-      {itsMe && myLastRollAt }
+      {itsMe && myLastRollAt}
     </div>
   );
 }
