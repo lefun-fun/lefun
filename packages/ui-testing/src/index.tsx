@@ -22,14 +22,8 @@ export function render(
     throw new Error("userId should not be null");
   }
 
-  // const store = createStore<MatchState>()(() => ({
-  //   ...state,
-  // }));
-
   // Simply create a store that always use our `state.
-  setMakeMove(() => {
-    // TODO apply move to store state
-  });
+  setMakeMove(() => {});
   setUseSelector(() => (selector) => {
     return selector(state);
   });

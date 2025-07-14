@@ -147,7 +147,7 @@ type TimeAdjust = "none" | "after" | "before";
 
 const toClientTime =
   (delta: number, latency: number) =>
-  (tsNumOrDate: number | Date, adjust: TimeAdjust = "none"): number => {
+  (tsNumOrDate: number | Date, adjust: TimeAdjust = "before"): number => {
     let ts: number;
     if (typeof tsNumOrDate !== "number") {
       ts = tsNumOrDate.getTime();
@@ -260,6 +260,7 @@ export const useMyUserId = () => {
   return useSelector((state) => state.userId);
 };
 
+// This has a funny look for backward compatibility reasons.
 export type _Store<GS extends GameStateBase> = {
   getState(): MatchState<GS>;
 };

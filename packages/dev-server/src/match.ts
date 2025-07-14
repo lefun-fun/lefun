@@ -358,7 +358,6 @@ class Match extends EventTarget {
       this._removeDelayedMoveForUser(userId);
     }
 
-    // FIXME make sure we do the same in prod.
     for (const userId of result.beginTurnUsers) {
       this._removeDelayedMoveForUser(userId);
     }
@@ -407,7 +406,6 @@ class Match extends EventTarget {
     if (userId) {
       // Remove any previous delayed move for this user.
       this._removeDelayedMoveForUser(userId);
-      // FIXME go do this in prod also I don't think we do it there. ^^^
       this.onExpiryDelayedMoves[userId] = { timeout, delayedMoveId };
     }
   }

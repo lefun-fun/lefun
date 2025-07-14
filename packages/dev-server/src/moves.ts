@@ -67,9 +67,9 @@ export class OptimisticBoards<GS extends GameStateBase> {
   }
 
   /*
-   * Note that in general we get more patches than the ones we have in our
-   * state, because of the `execute` bits. Here we only have the `executeNow`
-   * patches.
+   * Note that in general we get more patches than the ones we have in
+   * our state, because of the `execute` bits. In our state we only
+   * have the `executeNow` patches.
    */
   confirmMove({ moveId, patches }: { moveId?: string; patches: Patch[] }) {
     // Start from the confirmed boards

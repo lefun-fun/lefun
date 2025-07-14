@@ -44,8 +44,6 @@ enablePatches();
  *   path=playerboards/userId/xyz...
  * to
  *   path=playerboard/xyz...
- *
- * Note that we do the same thing in `match.ts`, these could be unified.
  */
 const reformatPlayerboardPatch = (patch: Patch) => {
   const { path } = patch;
@@ -76,10 +74,9 @@ const BoardForPlayer = ({
   }, [locale, messages]);
 
   const [loading, setLoading] = useState(true);
-  // const storeRef = useRef<Store | null>(null);
 
   // Here we use `valtio` as a test to see how well it works as a local state
-  // management solution.
+  // management solution. So far it's pretty good, perhaps we should also use it for the dev-server settings!
   const optimisticBoards = useRef(
     proxy(
       new OptimisticBoards({
@@ -138,8 +135,8 @@ const BoardForPlayer = ({
           onlyExecuteNow: true,
           // Note that technically we should not use anything from
           // `match.store` as this represents the DB.
-          gameData: match.store.gameData,
           matchData: match.store.matchData,
+          gameData: match.store.gameData,
           meta: match.store.meta,
         });
       } catch (e) {
@@ -184,7 +181,7 @@ const BoardForPlayer = ({
       };
     });
 
-    // As far as I know, valtio does not support shallow selectors.
+    // As far as I know, valtio does not support shallow selectors, but if I understand correctly it's not a concern with Valtio.
     setUseSelectorShallow(_useSelector);
 
     setLoading(false);

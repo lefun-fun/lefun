@@ -124,14 +124,11 @@ const pass: PM = {
 };
 
 const roll: PM = {
-  executeNow({ board, playerboard, userId }) {
+  executeNow({ board, userId }) {
     if (getCurrentPlayer(board) !== userId) {
       throw new Error("not your turn!");
     }
     board.players[userId].isRolling = true;
-
-    // Used for tests!
-    playerboard.lastRollAt = 0;
   },
   execute({ board, playerboards, userId, random, ts, turns, _ }) {
     playerboards[userId].lastRollAt = ts;
@@ -180,14 +177,10 @@ const kill: BoardMove<GS, KillPayload, PMT, BMT> = {
 type BM<P = null> = BoardMove<GS, P, PMT, BMT>;
 
 const initMove: BM = {
-  execute({ board, playerboards, _, ts }) {
+  execute({ board, _, ts }) {
     _.turns.begin(board.playerOrder[0]);
     _.delayMove("endMatch", MATCH_DURATION);
     board.endsAt = ts + MATCH_DURATION;
-    for (const userId of board.playerOrder) {
-      // HACK
-      playerboards[userId].lastRollAt = ts;
-    }
   },
 };
 

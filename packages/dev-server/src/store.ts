@@ -34,8 +34,6 @@ type State = {
   game: Game_;
   match: Match | undefined;
   //
-  meta: Meta | undefined;
-  //
   toggleShowDimensions: () => void;
   toggleCollapsed: () => void;
   setLayout: (layout: Layout) => void;
