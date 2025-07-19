@@ -316,3 +316,37 @@ test("moves inlined in the game with PMT and BMT - they are used", () => {
     maxPlayers: 1,
   } satisfies Game<GS, PMT, BMT>;
 });
+
+test("playerboards is required in initialBoard when PB is defined", () => {
+  type GS = GameState<{ a: number }, { b: number }>;
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const game = {
+    // @ts-expect-error missing payload
+    initialBoards: () => ({ board: { a: 0 } }),
+    playerMoves: {},
+    minPlayers: 1,
+    maxPlayers: 1,
+  } satisfies Game<GS>;
+});
+
+test("secretboard is required in initialBoard when SB is defined", () => {
+  type GS = GameState<{ a: number }, null, { c: number }>;
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const game = {
+    // @ts-expect-error missing payload
+    initialBoards: () => ({ board: { a: 0 }, playerboard: { b: 0 } }),
+    playerMoves: {},
+    minPlayers: 1,
+    maxPlayers: 1,
+  } satisfies Game<GS>;
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const game2 = {
+    initialBoards: () => ({ board: { a: 0 }, secretboard: { c: 0 } }),
+    playerMoves: {},
+    minPlayers: 1,
+    maxPlayers: 1,
+  } satisfies Game<GS>;
+});

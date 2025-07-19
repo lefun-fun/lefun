@@ -1,6 +1,7 @@
 import { Patch } from "immer";
 
 import {
+  GameId,
   Locale,
   MatchPlayersSettings,
   MatchSettings,
@@ -20,6 +21,8 @@ import {
   MoveExecutionOutput,
   Random,
 } from "@lefun/game";
+
+import { generateId } from "./utils";
 
 // This is what would normally go in a database.
 type MatchStore = {
@@ -47,18 +50,13 @@ type MatchStore = {
 // We increment this every time we make backward incompatible changes in the match
 // saved to local storage. We save this version with the match to later detect that
 // a saved match is too old.
-const VERSION = 4;
-
-// This could be improved...
-let _counter = 0;
-function generateId() {
-  return `${new Date().getTime()}-${_counter++}`;
-}
+const VERSION = 5;
 
 /* This class replaces our backend */
 class Match extends EventTarget {
   random: Random;
   game: Game_;
+  gameId: GameId;
   store: MatchStore;
   // We note what user has an on expiry delayed move.
   // This is necessary to be able to cancel these delayed move when a
@@ -70,6 +68,7 @@ class Match extends EventTarget {
 
   constructor({
     game,
+    gameId,
     players,
     matchSettings,
     matchPlayersSettings,
@@ -78,6 +77,7 @@ class Match extends EventTarget {
     locale,
   }: {
     game: Game_;
+    gameId: GameId;
     players: Record<UserId, User>;
     matchSettings: MatchSettings;
     matchPlayersSettings: MatchPlayersSettings;
@@ -85,9 +85,18 @@ class Match extends EventTarget {
     gameData: unknown;
     locale: Locale;
   });
-  constructor({ game, store }: { game: Game_; store: MatchStore });
   constructor({
     game,
+    gameId,
+    store,
+  }: {
+    game: Game_;
+    gameId: GameId;
+    store: MatchStore;
+  });
+  constructor({
+    game,
+    gameId,
     players,
     matchSettings,
     matchPlayersSettings,
@@ -98,6 +107,7 @@ class Match extends EventTarget {
     store,
   }: {
     game: Game_;
+    gameId: GameId;
     players?: Record<UserId, User>;
     matchSettings?: MatchSettings;
     matchPlayersSettings?: MatchPlayersSettings;
@@ -112,6 +122,7 @@ class Match extends EventTarget {
     const random = new Random();
     this.random = random;
     this.game = game;
+    this.gameId = gameId;
     this.onExpiryDelayedMoves = {};
 
     // If a store is provided, there isn't much to do.
@@ -218,7 +229,7 @@ class Match extends EventTarget {
 
     if (type === "playerMove") {
       try {
-        this.makeMove(userId, name, payload);
+        this.makeMove({ userId, name, payload });
       } catch (e) {
         console.error("error in delayed player move", e);
       } finally {
@@ -238,10 +249,14 @@ class Match extends EventTarget {
   }
 
   /* Both player and board moves */
-  _makeMove(moveName: string, payload: any, userId: UserId | null = null) {
+  _makeMove(
+    name: string,
+    payload: any,
+    userId: UserId | null = null,
+    moveId?: string,
+  ) {
     if (this.store.matchStatus == "over") {
-      console.warn("match is over");
-      return;
+      throw new Error("match is over");
     }
     // Execute the move.
     const now = new Date().getTime();
@@ -251,52 +266,38 @@ class Match extends EventTarget {
 
     let result: MoveExecutionOutput | null = null;
     if (userId) {
-      try {
-        result = executePlayerMove({
-          name: moveName,
-          payload,
-          game,
-          now,
-          userId,
-          board,
-          playerboards,
-          secretboard,
-          random,
-          meta,
-          matchData,
-          gameData,
-        });
-      } catch (e) {
-        console.error(
-          `Ignoring move "${moveName}" for user "${userId}" because of error`,
-        );
-        console.error(e);
-      }
+      result = executePlayerMove({
+        name,
+        payload,
+        game,
+        now,
+        userId,
+        board,
+        playerboards,
+        secretboard,
+        random,
+        meta,
+        matchData,
+        gameData,
+      });
     } else {
-      try {
-        result = executeBoardMove({
-          name: moveName,
-          payload,
-          game,
-          now,
-          board,
-          playerboards,
-          secretboard,
-          random,
-          meta,
-          matchData,
-          gameData,
-        });
-      } catch (e) {
-        console.error(
-          `Ignoring move "${moveName}" for user "${userId}" because of error`,
-        );
-        console.error(e);
-      }
+      result = executeBoardMove({
+        name,
+        payload,
+        game,
+        now,
+        board,
+        playerboards,
+        secretboard,
+        random,
+        meta,
+        matchData,
+        gameData,
+      });
     }
 
     if (!result) {
-      return;
+      throw new Error("bug");
     }
 
     // Update the store.
@@ -328,7 +329,7 @@ class Match extends EventTarget {
           continue;
         }
         this.dispatchEvent(
-          new CustomEvent(`patches:${userId}`, { detail: { patches } }),
+          new CustomEvent(`patches:${userId}`, { detail: { moveId, patches } }),
         );
       }
       // This is for the dev server state view so that it knows it needs to update.
@@ -364,7 +365,7 @@ class Match extends EventTarget {
     });
 
     if (result.beginTurnUsers.size > 0 || result.endTurnUsers.size > 0) {
-      this.dispatchEvent(new CustomEvent("metaChanged", { detail: { meta } }));
+      this.dispatchEvent(new CustomEvent("metaChanged"));
     }
 
     // Also cancel move expiry timeouts for users whose turn has ended.
@@ -372,20 +373,41 @@ class Match extends EventTarget {
       this._removeDelayedMoveForUser(userId);
     }
 
+    for (const userId of result.beginTurnUsers) {
+      this._removeDelayedMoveForUser(userId);
+    }
+
     // Delayed moves
     for (const delayedMove of result.delayedMoves) {
       this._addDelayedMove(delayedMove);
     }
+
+    saveMatchToLocalStorage(this, this.gameId);
   }
 
-  makeBoardMove(moveName: string, payload: any) {
-    console.warn("board move", moveName, payload);
-    return this._makeMove(moveName, payload, null);
+  makeBoardMove(name: string, payload: any) {
+    console.warn("board move", name, payload);
+    this._makeMove(name, payload, null);
   }
 
-  makeMove(userId: UserId, moveName: string, payload: any) {
-    console.warn("move", moveName, payload, "by user", userId);
-    return this._makeMove(moveName, payload, userId);
+  makeMove({
+    userId,
+    name,
+    payload,
+    moveId,
+  }: {
+    userId: UserId;
+    name: string;
+    payload: any;
+    moveId?: string;
+  }) {
+    console.warn("move", name, payload, "by user", userId);
+    try {
+      this._makeMove(name, payload, userId, moveId);
+    } catch (e) {
+      console.error("There was an error executing move", name, e);
+      this.dispatchEvent(new CustomEvent("revertMove", { detail: { moveId } }));
+    }
   }
 
   _addDelayedMove(delayedMove: DelayedMove) {
@@ -399,6 +421,8 @@ class Match extends EventTarget {
     }, ts - new Date().getTime());
 
     if (userId) {
+      // Remove any previous delayed move for this user.
+      this._removeDelayedMoveForUser(userId);
       this.onExpiryDelayedMoves[userId] = { timeout, delayedMoveId };
     }
   }
@@ -432,7 +456,7 @@ class Match extends EventTarget {
     return JSON.stringify({ store, version: VERSION });
   }
 
-  static _deserialize(str: string, game: Game_): Match {
+  static _deserialize(str: string, game: Game_, gameId: GameId): Match {
     const obj = JSON.parse(str);
     const { store, version } = obj;
 
@@ -443,6 +467,7 @@ class Match extends EventTarget {
 
     return new Match({
       game,
+      gameId,
       store,
     });
   }
@@ -492,7 +517,7 @@ function saveMatchToLocalStorage(match: Match, gameId?: string) {
   localStorage.setItem(_matchKey(gameId), match._serialize());
 }
 
-function loadMatchFromLocalStorage(game: Game_, gameId?: string): Match | null {
+function loadMatchFromLocalStorage(game: Game_, gameId: GameId): Match | null {
   const str = localStorage.getItem(_matchKey(gameId));
 
   if (!str) {
@@ -500,7 +525,7 @@ function loadMatchFromLocalStorage(game: Game_, gameId?: string): Match | null {
   }
 
   try {
-    return Match._deserialize(str, game);
+    return Match._deserialize(str, game, gameId);
   } catch (e) {
     console.warn("Failed to deserialize match", e);
     return null;

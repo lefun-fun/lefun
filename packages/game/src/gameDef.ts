@@ -8,6 +8,7 @@ import {
   GameStat,
   GameStats_,
   IfAny,
+  IfAnyNull,
   IfNull,
   Locale,
   MatchPlayerSettings,
@@ -18,17 +19,15 @@ import {
 
 import { Random } from "./random";
 
-export type GameStateBase = { B: any; PB: any; SB: any };
-
-export type MoveTypesBase = Record<string, any>;
-
-export type GameState<B, PB = EmptyObject, SB = EmptyObject> = {
+export type GameStateBase<B = any, PB = any, SB = any> = {
   B: B;
   PB: PB;
   SB: SB;
 };
 
-type EmptyObject = Record<string, never>;
+export type MoveTypesBase = Record<string, any>;
+
+export type GameState<B, PB = null, SB = null> = GameStateBase<B, PB, SB>;
 
 export type GameStats = GameStat[];
 
@@ -121,6 +120,8 @@ export type MoveSideEffects<
   logMatchStat: LogMatchStat<MS>;
 };
 
+// TODO Add `ts` in the options here
+// https://github.com/lefun-fun/lefun/issues/52
 type ExecuteNowOptions<
   GS extends GameStateBase,
   P,
@@ -364,14 +365,24 @@ export type GetMatchScoreTextOptions<B> = {
   board: B;
 };
 
+export type InitialBoardsOutput<GS extends GameStateBase> = {
+  board: GS["B"];
+} & IfAnyNull<
+  GS["PB"],
+  { playerboards?: Record<UserId, GS["PB"]> },
+  unknown,
+  { playerboards: Record<UserId, GS["PB"]> }
+> &
+  IfAnyNull<
+    GS["SB"],
+    { secretboard?: GS["SB"] },
+    unknown,
+    { secretboard: GS["SB"] }
+  >;
+
 export type InitialBoard<GS extends GameStateBase = GameStateBase> = (
   options: InitialBoardsOptions<GS["B"]>,
-) => {
-  board: GS["B"];
-  playerboards?: Record<UserId, GS["PB"]>;
-  secretboard?: GS["SB"];
-};
-
+) => InitialBoardsOutput<GS>;
 // This is what the game developer must implement.
 export type Game<
   GS extends GameStateBase = GameStateBase,
