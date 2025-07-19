@@ -229,7 +229,7 @@ class Match extends EventTarget {
 
     if (type === "playerMove") {
       try {
-        this.makeMove({ userId, moveName: name, payload });
+        this.makeMove({ userId, name, payload });
       } catch (e) {
         console.error("error in delayed player move", e);
       } finally {
@@ -250,7 +250,7 @@ class Match extends EventTarget {
 
   /* Both player and board moves */
   _makeMove(
-    moveName: string,
+    name: string,
     payload: any,
     userId: UserId | null = null,
     moveId?: string,
@@ -267,7 +267,7 @@ class Match extends EventTarget {
     let result: MoveExecutionOutput | null = null;
     if (userId) {
       result = executePlayerMove({
-        name: moveName,
+        name,
         payload,
         game,
         now,
@@ -282,7 +282,7 @@ class Match extends EventTarget {
       });
     } else {
       result = executeBoardMove({
-        name: moveName,
+        name,
         payload,
         game,
         now,
@@ -385,27 +385,27 @@ class Match extends EventTarget {
     saveMatchToLocalStorage(this, this.gameId);
   }
 
-  makeBoardMove(moveName: string, payload: any) {
-    console.warn("board move", moveName, payload);
-    this._makeMove(moveName, payload, null);
+  makeBoardMove(name: string, payload: any) {
+    console.warn("board move", name, payload);
+    this._makeMove(name, payload, null);
   }
 
   makeMove({
     userId,
-    moveName,
+    name,
     payload,
     moveId,
   }: {
     userId: UserId;
-    moveName: string;
+    name: string;
     payload: any;
     moveId?: string;
   }) {
-    console.warn("move", moveName, payload, "by user", userId);
+    console.warn("move", name, payload, "by user", userId);
     try {
-      this._makeMove(moveName, payload, userId, moveId);
+      this._makeMove(name, payload, userId, moveId);
     } catch (e) {
-      console.error("There was an error executing move", moveName, e);
+      console.error("There was an error executing move", name, e);
       this.dispatchEvent(new CustomEvent("revertMove", { detail: { moveId } }));
     }
   }

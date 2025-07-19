@@ -157,6 +157,7 @@ const BoardForPlayer = ({
     });
 
     const _useSelector = (): UseSelector => {
+      // We wrap it to respect the rules of hooks.
       const useSelector = <GS extends GameStateBase, T>(
         selector: Selector<GS, T>,
       ): T => {
