@@ -31,7 +31,7 @@ import {
   UseSelector,
 } from "@lefun/ui";
 
-import { Match, saveMatchToLocalStorage } from "./match";
+import { Match } from "./match";
 import { OptimisticBoards } from "./moves";
 import { useStore } from "./store";
 import { generateId } from "./utils";
@@ -154,8 +154,6 @@ const BoardForPlayer = ({
 
       // Run the move in the backend also.
       match.makeMove({ userId, moveName, payload, moveId });
-
-      saveMatchToLocalStorage(match, gameId);
     });
 
     const _useSelector = (): UseSelector => {
@@ -746,10 +744,13 @@ const ItsMyTurn = ({ userId }: { userId: UserId }) => {
     <div
       className={classNames(
         "pointer-events-none",
-        "absolute inset-0 z-50 border-4",
-        itsMyTurn ? "border-red-600" : "border-gray-300",
+        "text-xs text-center",
+        "relative w-full h-4",
+        itsMyTurn ? "font-semibold bg-red-200" : "bg-gray-100",
       )}
-    ></div>
+    >
+      {userId}
+    </div>
   );
 };
 
@@ -764,16 +765,19 @@ function PlayerIframe({ userId }: { userId: UserId }) {
   return (
     <>
       <div
-        className={classNames("w-full flex-1 h-0 overflow-hidden relative z-0")}
+        className={classNames(
+          "w-full flex-1 h-0 flex flex-col overflow-hidden relative z-0",
+        )}
         key={userId}
         ref={ref}
       >
-        <ItsMyTurn userId={userId} />
-        <iframe
-          className="z-0 absolute w-full h-full inset-1"
-          src={`${href}?u=${userId}&l=${locale}`}
-          key={key}
-        ></iframe>
+        <div className="flex-1 w-full">
+          <iframe
+            className="z-10 relative bg-white w-full h-full"
+            src={`${href}?u=${userId}&l=${locale}`}
+            key={key}
+          ></iframe>
+        </div>
         <Dimensions componentRef={ref} />
       </div>
     </>
@@ -793,10 +797,12 @@ function PlayersIframes() {
         if (visibleUserId === "all" || visibleUserId === userId) {
           return (
             <div className="w-full h-full flex flex-col" key={userId}>
-              {userId === "spectator" && (
-                <div className="bg-neutral-200 text-center text-sm">
+              {userId === "spectator" ? (
+                <div className="bg-neutral-200 text-center text-xs h-4">
                   Spectator
                 </div>
+              ) : (
+                <ItsMyTurn userId={userId} />
               )}
               <PlayerIframe userId={userId} />
             </div>

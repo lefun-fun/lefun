@@ -4,7 +4,12 @@ import "./index.css";
 import { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 
-import type { Locale, MatchPlayersSettings, MatchSettings } from "@lefun/core";
+import type {
+  GameId,
+  Locale,
+  MatchPlayersSettings,
+  MatchSettings,
+} from "@lefun/core";
 import { Game, Game_, INIT_MOVE, parseGame } from "@lefun/game";
 
 import { AllMessages, BoardForPlayer, Lefun, Main, RulesWrapper } from "./App";
@@ -23,6 +28,7 @@ function getUserIds(numPlayers: number) {
 
 const initMatch = ({
   game,
+  gameId,
   matchData,
   gameData,
   locale,
@@ -31,6 +37,7 @@ const initMatch = ({
   numPlayers,
 }: {
   game: Game_;
+  gameId: GameId;
   matchData: unknown;
   gameData: unknown;
   locale?: Locale;
@@ -119,6 +126,7 @@ const initMatch = ({
 
   const match = new Match({
     game,
+    gameId,
     matchSettings,
     matchPlayersSettings,
     matchData,
@@ -132,22 +140,22 @@ const initMatch = ({
 
 async function render({
   game,
+  gameId,
   boardComponent,
   rulesComponent,
   matchData,
   gameData,
   idName = "home",
   messages = { en: {} },
-  gameId = "unknown-game-id",
 }: {
   game: Game;
+  gameId: GameId;
   boardComponent: () => Promise<() => ReactNode>;
   rulesComponent?: () => Promise<() => ReactNode>;
   matchData?: any;
   gameData?: any;
   idName?: string;
   messages?: AllMessages;
-  gameId: string;
 }) {
   function renderComponent(content: ReactNode) {
     const container = document.getElementById(idName);
@@ -225,6 +233,7 @@ async function render({
 
     match = initMatch({
       game: game_,
+      gameId,
       matchData,
       gameData,
       locale: locale || match?.store.meta.locale,
@@ -256,6 +265,7 @@ async function render({
     if (!match) {
       match = initMatch({
         game: game_,
+        gameId,
         matchData,
         gameData,
       });

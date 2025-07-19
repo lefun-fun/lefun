@@ -103,35 +103,37 @@ function Board() {
   );
 
   return (
-    <div>
-      <div>
-        <Trans>The template game</Trans>
-        <div>Sum: {sum}</div>
-        <EndMatchCountDown />
-        {Object.entries(matchSettings).map(([key, value]) => (
-          <div key={key}>
-            <span className="bold">{key}:</span> {value}
-          </div>
-        ))}
-        {players.map((userId) => (
-          <Player key={userId} userId={userId} />
-        ))}
-      </div>
+    <div className="outer">
+      <div className="inner">
+        <div>
+          <Trans>The template game</Trans>
+          <div>Sum: {sum}</div>
+          <EndMatchCountDown />
+          {Object.entries(matchSettings).map(([key, value]) => (
+            <div key={key}>
+              <span className="bold">{key}:</span> {value}
+            </div>
+          ))}
+          {players.map((userId) => (
+            <Player key={userId} userId={userId} />
+          ))}
+        </div>
 
-      <>
-        <button
-          className={classNames(!itsMyTurn && "disabled")}
-          onClick={() => makeMove("roll")}
-        >
-          <Trans>Roll</Trans>
-        </button>
-        <button
-          className={classNames(!itsMyTurn && "disabled")}
-          onClick={() => makeMove("pass")}
-        >
-          <Trans>Pass</Trans>
-        </button>
-      </>
+        <>
+          <button
+            className={classNames(!itsMyTurn && "disabled")}
+            onClick={() => makeMove("roll")}
+          >
+            <Trans>Roll</Trans>
+          </button>
+          <button
+            className={classNames(!itsMyTurn && "disabled")}
+            onClick={() => makeMove("pass")}
+          >
+            <Trans>Pass</Trans>
+          </button>
+        </>
+      </div>
     </div>
   );
 }

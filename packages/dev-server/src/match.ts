@@ -1,6 +1,7 @@
 import { Patch } from "immer";
 
 import {
+  GameId,
   Locale,
   MatchPlayersSettings,
   MatchSettings,
@@ -55,6 +56,7 @@ const VERSION = 5;
 class Match extends EventTarget {
   random: Random;
   game: Game_;
+  gameId: GameId;
   store: MatchStore;
   // We note what user has an on expiry delayed move.
   // This is necessary to be able to cancel these delayed move when a
@@ -66,6 +68,7 @@ class Match extends EventTarget {
 
   constructor({
     game,
+    gameId,
     players,
     matchSettings,
     matchPlayersSettings,
@@ -74,6 +77,7 @@ class Match extends EventTarget {
     locale,
   }: {
     game: Game_;
+    gameId: GameId;
     players: Record<UserId, User>;
     matchSettings: MatchSettings;
     matchPlayersSettings: MatchPlayersSettings;
@@ -81,9 +85,18 @@ class Match extends EventTarget {
     gameData: unknown;
     locale: Locale;
   });
-  constructor({ game, store }: { game: Game_; store: MatchStore });
   constructor({
     game,
+    gameId,
+    store,
+  }: {
+    game: Game_;
+    gameId: GameId;
+    store: MatchStore;
+  });
+  constructor({
+    game,
+    gameId,
     players,
     matchSettings,
     matchPlayersSettings,
@@ -94,6 +107,7 @@ class Match extends EventTarget {
     store,
   }: {
     game: Game_;
+    gameId: GameId;
     players?: Record<UserId, User>;
     matchSettings?: MatchSettings;
     matchPlayersSettings?: MatchPlayersSettings;
@@ -108,6 +122,7 @@ class Match extends EventTarget {
     const random = new Random();
     this.random = random;
     this.game = game;
+    this.gameId = gameId;
     this.onExpiryDelayedMoves = {};
 
     // If a store is provided, there isn't much to do.
@@ -366,6 +381,8 @@ class Match extends EventTarget {
     for (const delayedMove of result.delayedMoves) {
       this._addDelayedMove(delayedMove);
     }
+
+    saveMatchToLocalStorage(this, this.gameId);
   }
 
   makeBoardMove(moveName: string, payload: any) {
@@ -439,7 +456,7 @@ class Match extends EventTarget {
     return JSON.stringify({ store, version: VERSION });
   }
 
-  static _deserialize(str: string, game: Game_): Match {
+  static _deserialize(str: string, game: Game_, gameId: GameId): Match {
     const obj = JSON.parse(str);
     const { store, version } = obj;
 
@@ -450,6 +467,7 @@ class Match extends EventTarget {
 
     return new Match({
       game,
+      gameId,
       store,
     });
   }
@@ -499,7 +517,7 @@ function saveMatchToLocalStorage(match: Match, gameId?: string) {
   localStorage.setItem(_matchKey(gameId), match._serialize());
 }
 
-function loadMatchFromLocalStorage(game: Game_, gameId?: string): Match | null {
+function loadMatchFromLocalStorage(game: Game_, gameId: GameId): Match | null {
   const str = localStorage.getItem(_matchKey(gameId));
 
   if (!str) {
@@ -507,7 +525,7 @@ function loadMatchFromLocalStorage(game: Game_, gameId?: string): Match | null {
   }
 
   try {
-    return Match._deserialize(str, game);
+    return Match._deserialize(str, game, gameId);
   } catch (e) {
     console.warn("Failed to deserialize match", e);
     return null;
