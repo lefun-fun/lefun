@@ -27,8 +27,6 @@
     "dev": "pnpm vite --host",
     "lingui:compile": "pnpm lingui compile",
     "lingui:extract": "pnpm lingui extract",
-    "format": "pnpm eslint . --fix",
-    "check-format": "pnpm eslint . --quiet",
     "test": "pnpm vitest run"
   },
   "devDependencies": {

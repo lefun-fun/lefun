@@ -169,6 +169,7 @@ test("todo", () => {
   const move: PlayerMove<GS, null, PMT, BMT> = {};
   const boardMove: BoardMove<GS, null, PMT, BMT> = {};
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const game = {
     initialBoards: () => ({ board: { x: 0 } }),
     playerMoves: { move },
@@ -201,9 +202,12 @@ describe("GetPayload", () => {
     const move1: PlayerMove<GS, null> = {
       //
     };
+
     const move2: PlayerMove<GS, { x: number }> = {
       //
     };
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const game = {
       initialBoards: () => ({ board: { a: 0 } }),
       playerMoves: {

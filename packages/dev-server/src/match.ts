@@ -429,7 +429,6 @@ class Match extends EventTarget {
 
   /* Remove a delayed move from the state, for instance after its execution. */
   _removeDelayedMove(delayedMoveId: string) {
-    this.store.delayedMoves[delayedMoveId];
     // If it's a delayed move on expiry, we also remove the item in the per
     // user object..
     const userDelayedMove = this.onExpiryDelayedMoves[delayedMoveId];

@@ -1,6 +1,6 @@
-import { render } from "@lefun/dev-server";
-
 import { game } from "game1-v2.3.0-game";
+
+import { render } from "@lefun/dev-server";
 
 // @ts-expect-error abc
 import { messages as en } from "./locales/en/messages";

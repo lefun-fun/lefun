@@ -2,6 +2,7 @@ import "./index.css";
 
 import { Trans } from "@lingui/macro";
 import classNames from "classnames";
+import type { G, GS } from "game1-v2.3.0-game";
 
 import type { UserId } from "@lefun/core";
 import {
@@ -11,8 +12,6 @@ import {
   useIsPlayer,
   useUsername,
 } from "@lefun/ui";
-
-import type { G, GS } from "game1-v2.3.0-game";
 
 const useSelector = makeUseSelector<GS>();
 const useSelectorShallow = makeUseSelectorShallow<GS>();

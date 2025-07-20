@@ -139,7 +139,7 @@ const BoardForPlayer = ({
           gameData: match.store.gameData,
           meta: match.store.meta,
         });
-      } catch (e) {
+      } catch {
         console.warn(
           `Ignoring move "${name}" for user "${userId}" because of error`,
         );

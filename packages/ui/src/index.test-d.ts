@@ -19,6 +19,7 @@ test("makeMove - payload-typed", () => {
 
   type GS = GameState<{ x: number }>;
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const game = {
     initialBoards: () => ({ board: { x: 2 } }),
     playerMoves: { move1, move2 },
@@ -65,6 +66,7 @@ test("makeMove - not-payload-typed", () => {
 
   type GS = GameState<{ x: number }>;
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const game = {
     initialBoards: () => ({ board: { x: 2 } }),
     playerMoves: { move1, move2 },
@@ -162,6 +164,7 @@ test("makeMove - player-moves-typed", () => {
 
   type GS = GameState<{ x: number }>;
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const game = {
     initialBoards: () => ({ board: { x: 2 } }),
     playerMoves: { move1, move2, move3 },

@@ -20,18 +20,11 @@
     "clean": "rm -rf ./dist",
     "compile": "rollup --config",
     "watch": "rollup --config --watch",
-    "test": "vitest run src",
-    "format": "pnpm exec eslint . --fix",
-    "check-format": "pnpm exec eslint . --quiet"
+    "test": "vitest run src"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^21.1.0",
     "@rollup/plugin-node-resolve": "^13.3.0",
-    "@typescript-eslint/eslint-plugin": "^7.16.1",
-    "@typescript-eslint/parser": "^7.16.1",
-    "eslint": "^8.57.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-simple-import-sort": "^12.1.1",
     "rollup": "^2.79.1",
     "rollup-plugin-typescript2": "^0.31.2",
     "tslib": "^2.6.3",

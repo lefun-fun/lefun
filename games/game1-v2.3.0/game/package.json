@@ -11,8 +11,6 @@
   "scripts": {
     "build": "rm -rf ./dist && pnpm rollup --config",
     "watch": "pnpm rollup --config --watch",
-    "format": "pnpm eslint . --fix",
-    "check-format": "pnpm eslint . --quiet",
     "test": "vitest run src"
   },
   "devDependencies": {
