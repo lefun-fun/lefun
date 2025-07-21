@@ -244,7 +244,7 @@ class Match extends EventTarget {
         this._removeDelayedMove(delayedMoveId);
       }
     } else {
-      throw new Error(`Unknown delayed move type "${type}"`);
+      throw new Error(`Unknown delayed move type`);
     }
   }
 

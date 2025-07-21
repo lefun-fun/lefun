@@ -50,6 +50,6 @@ test.each([
   "getRanks %s %s",
   (scores: Record<string, number>, ranks: Record<string, number>) => {
     // Our function works on `match.meta`, so let's make up one from the points.
-    expect(getRanks({ scores, scoreType: "integer" })).toEqual(ranks);
+    expect(getRanks({ scores, gameStatType: "integer" })).toEqual(ranks);
   },
 );

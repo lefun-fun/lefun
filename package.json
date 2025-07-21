@@ -7,8 +7,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "format": "pnpm eslint packages games --fix",
-    "lint": "pnpm eslint packages games --quiet; pnpm check-types",
+    "format": "pnpm eslint packages games --fix; pnpm prettier --write .",
+    "lint": "pnpm eslint packages games --quiet; pnpm prettier --check .; pnpm check-types",
     "check-types": "lerna exec --stream --parallel --no-bail -- tsc --skipLibCheck --pretty --noEmit"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
     "@types/eslint": "^9.6.1",
     "eslint": "^9.31.0",
     "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
     "prettier": "^3.3.3",
     "typescript": "^5.5.4",
     "typescript-eslint": "^8.37.0"

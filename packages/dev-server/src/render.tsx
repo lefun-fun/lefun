@@ -141,6 +141,8 @@ const initMatch = ({
 async function render({
   game,
   gameId,
+  board,
+  rules,
   boardComponent,
   rulesComponent,
   matchData,
@@ -150,7 +152,11 @@ async function render({
 }: {
   game: Game;
   gameId: GameId;
-  boardComponent: () => Promise<() => ReactNode>;
+  // Backward compability
+  board?: () => Promise<ReactNode>;
+  rules?: () => Promise<ReactNode>;
+  // new way to load components
+  boardComponent?: () => Promise<() => ReactNode>;
   rulesComponent?: () => Promise<() => ReactNode>;
   matchData?: any;
   gameData?: any;
@@ -170,10 +176,15 @@ async function render({
   const isRules = urlParams.get("v") === "rules";
 
   if (isRules) {
-    if (!rulesComponent) {
+    if (!rulesComponent && !rules) {
       return renderComponent(<div>Rules not defined</div>);
     }
-    const RulesComponent = await rulesComponent();
+
+    // This is complicated to support backward compatibility.
+    let RulesComponent = rulesComponent && (await rulesComponent());
+    const wholeComponent = rules && (await rules());
+    RulesComponent = RulesComponent || (() => wholeComponent);
+
     return renderComponent(
       <RulesWrapper messages={messages[locale]} locale={locale}>
         <RulesComponent />
@@ -186,10 +197,13 @@ async function render({
   // Is it the player's board?
   if (userId !== null) {
     const match = ((window.top as any).lefun as Lefun).match;
-    const BoardComponent = await boardComponent();
+
+    const BoardComponent = boardComponent && (await boardComponent());
+    const wholeComponent = board && (await board());
+
     const content = (
       <BoardForPlayer
-        BoardComponent={BoardComponent}
+        BoardComponent={BoardComponent || (() => wholeComponent)}
         match={match}
         userId={userId}
         messages={messages[locale]}

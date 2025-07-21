@@ -50,18 +50,17 @@ export type GameSetting = {
   }) => string;
 };
 
+export type GameSetting_ = GameSetting & {
+  // We set this from the `isDefault` option if there is one.
+  // This avoids the need to loop through all the options to find it.
+  defaultValue: string;
+};
+
 export type GameSettings = GameSetting[];
 
 export type GameSettings_ = {
   allIds: string[];
-  byId: Record<
-    string,
-    GameSetting & {
-      // We set this from the `isDefault` option if there is one.
-      // This avoids the need to loop through all the options to find it.
-      defaultValue: string;
-    }
-  >;
+  byId: Record<string, GameSetting_>;
 };
 
 /*

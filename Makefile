@@ -16,13 +16,11 @@ watch:
 
 .PHONY: format
 format:
-	pnpm lerna run format
-	pnpm prettier . --write
+	pnpm format
 
-.PHONY: check-format
-check-format:
-	pnpm lerna run check-format
-	pnpm prettier . --check
+.PHONY:lint 
+lint:
+	pnpm lint
 
 .PHONY: bump-version
 bump-version:

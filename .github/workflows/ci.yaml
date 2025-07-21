@@ -21,5 +21,5 @@ jobs:
           cache: "pnpm"
       - run: make install
       - run: make build
-      - run: make check-format
+      - run: make lint
       - run: make test

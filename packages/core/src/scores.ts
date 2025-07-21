@@ -1,18 +1,20 @@
-import { ScoreType, UserId } from ".";
+import { GameStatType, UserId } from ".";
 
 /*
  * Given some `scores`, get ranks for players.
  */
 export const getRanks = ({
   scores,
-  scoreType,
+  gameStatType,
 }: {
   scores: Record<UserId, number>;
-  scoreType: ScoreType;
+  gameStatType: GameStatType;
 }): Record<UserId, number> => {
   let higherIsBetter: boolean;
-  switch (scoreType) {
+  switch (gameStatType) {
     case "integer":
+    case "number":
+    case "boolean":
       higherIsBetter = true;
       break;
     case "rank":
@@ -27,7 +29,7 @@ export const getRanks = ({
   // Otherwise we could end up with an infinite loop later!
   let points = Object.values(scores).filter(
     (score) => score != null && isFinite(score),
-  ) as number[];
+  );
 
   let currentRank = 0;
 

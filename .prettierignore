@@ -1,2 +1,3 @@
 packages/*/dist
 pnpm-lock.yaml
+games/**/locales/*/messages.mjs

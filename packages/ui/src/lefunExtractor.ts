@@ -1,9 +1,10 @@
 import { extractor as defaultExtractor } from "@lingui/cli/api";
+import { ExtractedMessage } from "@lingui/conf";
 
 import { gameMessageKeys } from "@lefun/core";
-import { Game } from "@lefun/game";
+import { Game, GameStateBase } from "@lefun/game";
 
-export const lefunExtractor = (game: Game<any, any>) => ({
+export const lefunExtractor = <GS extends GameStateBase>(game: Game<GS>) => ({
   first: true,
   match(filename: string) {
     const extensions = [".ts", ".tsx"];
@@ -17,12 +18,12 @@ export const lefunExtractor = (game: Game<any, any>) => ({
   async extract(
     filename: string,
     code: string,
-    onMessageExtracted: any,
+    onMessageExtracted: (msg: ExtractedMessage) => void,
     ctx: any,
   ) {
     if (this.first) {
       this.first = false;
-      const origin = ["lefun", 0];
+      const origin: [string, number] = ["lefun", 0];
       // const fields = {
       //   name: "The name of your game",
       //   tagline: "One line tag line for your game",

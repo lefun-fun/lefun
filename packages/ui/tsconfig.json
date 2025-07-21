@@ -7,5 +7,5 @@
     "jsx": "react-jsx",
     "moduleResolution": "bundler"
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*"]
 }

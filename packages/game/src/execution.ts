@@ -181,7 +181,7 @@ export function executePlayerMove<GS extends GameStateBase>({
       },
     );
     if (error) {
-      throw error;
+      throw error as Error;
     }
 
     ({ board, playerboards } = output);
@@ -210,7 +210,7 @@ export function executePlayerMove<GS extends GameStateBase>({
     );
 
     if (error) {
-      throw error;
+      throw error as Error;
     }
 
     ({ board, playerboards, secretboard } = output);
@@ -432,7 +432,7 @@ export function executeBoardMove<GS extends GameStateBase>({
   );
 
   if (error) {
-    throw error;
+    throw error as Error;
   }
 
   ({ board, playerboards, secretboard } = output);

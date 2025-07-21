@@ -3,6 +3,7 @@ import {
   Credits,
   GamePlayerSettings,
   GamePlayerSettings_,
+  GameSetting_,
   GameSettings,
   GameSettings_,
   GameStat,
@@ -513,7 +514,7 @@ function normalizeSettings(settings: GameSettings | GamePlayerSettings) {
       throw new Error(`multiple default values for game setting ${key}`);
     }
 
-    (gameSetting as any).defaultValue =
+    (gameSetting as GameSetting_).defaultValue =
       defaultValue ?? gameSetting.options[0].value;
   }
 
