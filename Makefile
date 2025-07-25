@@ -28,5 +28,5 @@ bump-version:
 	$(MAKE) format
 
 .PHONY: publish
-publish: check-format build test
+publish: lint build test
 	pnpm publish --access public --filter=@lefun/*
