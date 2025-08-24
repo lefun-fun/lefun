@@ -9,7 +9,10 @@ export type AkaType = "similar" | "aka" | "inspired" | "original";
 export type User = {
   username: string;
   isGuest: boolean;
-  isBot?: boolean;
+  isBot: boolean;
+
+  turnBeganAt: number | undefined;
+  turnExpiresAt: number | undefined;
 };
 
 export type UsersState = { byId: Record<UserId, User> };

@@ -12,7 +12,7 @@ import {
 type Player = {
   isRolling: boolean;
   diceValue?: number;
-  expiresAt?: number;
+  // expiresAt?: number;
   isDead: boolean;
 };
 
@@ -88,7 +88,9 @@ const goToNextPlayerNow = ({
 }) => {
   const { playerOrder, currentPlayerIndex } = board;
 
-  turns.end(getCurrentPlayer(board));
+  const currentPlayer = getCurrentPlayer(board);
+  turns.end(currentPlayer);
+  // board.players[currentPlayer].expiresAt = undefined;
 
   let nextPlayerIndex = currentPlayerIndex;
   let nextPlayer = playerOrder[currentPlayerIndex];
@@ -109,18 +111,18 @@ const goToNextPlayerNow = ({
   });
 };
 
-const goToNextPlayer = ({ board, ts }: { board: B; ts: number }) => {
-  const nextPlayer = getCurrentPlayer(board);
-  board.players[nextPlayer].expiresAt = ts + TURN_DURATION;
-};
+// const goToNextPlayer = ({ board, ts }: { board: B; ts: number }) => {
+// const nextPlayer = getCurrentPlayer(board);
+// board.players[nextPlayer].expiresAt = ts + TURN_DURATION;
+// };
 
 const pass: PM = {
   executeNow({ board, turns }) {
     goToNextPlayerNow({ board, turns });
   },
-  execute({ board, ts }) {
-    goToNextPlayer({ board, ts });
-  },
+  // execute({ board, ts }) {
+  // goToNextPlayer({ board, ts });
+  // },
 };
 
 const roll: PM = {
@@ -150,7 +152,7 @@ const roll: PM = {
 
     // If it was the player's turn, we go to the next player.
     goToNextPlayerNow({ board, turns });
-    goToNextPlayer({ board, ts });
+    // goToNextPlayer({ board, ts });
 
     if (board.sum >= 20) {
       _.endMatch();
@@ -161,12 +163,12 @@ const roll: PM = {
 };
 
 const kill: BoardMove<GS, KillPayload, PMT, BMT> = {
-  execute({ board, payload, _, turns, ts }) {
+  execute({ board, payload, _, turns }) {
     const { userId } = payload;
     board.players[userId].diceValue = undefined;
     board.players[userId].isDead = true;
     goToNextPlayerNow({ board, turns });
-    goToNextPlayer({ board, ts });
+    // goToNextPlayer({ board, ts });
 
     if (Object.values(board.players).every((p) => p.isDead)) {
       _.endMatch();
@@ -187,7 +189,7 @@ const initMove: BM = {
 const endMatch: BM = {
   execute({ board, _ }) {
     for (const userId of board.playerOrder) {
-      board.players[userId].expiresAt = undefined;
+      // board.players[userId].expiresAt = undefined;
       board.players[userId].isDead = true;
     }
 

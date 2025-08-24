@@ -24,10 +24,12 @@ export interface Player {
   // Score for the player at the end of the match.
   // What it means depends on the type of score as defined in the Game.
   // See
+  // TODO: Deprecate this.
   score?: number;
 
   // Rank of the player for the match. Even though this can be deduced
   // from the `score`, having it here makes que user stats per rank easy to fetch.
+  // TODO: Deprecate this.
   rank?: number;
 
   // Is it this player's turn?
@@ -37,7 +39,15 @@ export interface Player {
   // * It is NOT used to check for permission of making moves
   itsYourTurn: boolean;
 
+  // `undefined` when it's not our turn and for backward compatibility
+  // (older matches won't have that field).
+  turnBeganAt?: number;
+
+  // `undefined` when it's not our turn and for backward compatibility
+  turnExpiresAt?: number;
+
   // After coming out of the internet the date is in a string.
+  // TODO: Deprecate this.
   joinedAt: Date | string;
 
   // Is the player voting to end the match?
@@ -55,6 +65,7 @@ export type Meta = {
 
   // Score for the match. This makes sense for collaborative/solo matches. We could put
   // the best score in the "game" page.
+  // TODO Deprecate this.
   score?: number;
 
   // Kept for backward compatibility, those are not used anymore.
@@ -146,29 +157,70 @@ export const metaRemoveUserFromMatch = (meta: Meta, userId: UserId): void => {
   meta.players.allIds.splice(idx, 1);
 };
 
-export const metaSetTurns = ({
+const normalizeUserIds = ({
+  userIds,
+  meta,
+}: {
+  userIds: UserId | UserId[] | "all";
+  meta: Meta;
+}): UserId[] => {
+  if (userIds === "all") {
+    return meta.players.allIds;
+  }
+
+  if (!Array.isArray(userIds)) {
+    return [userIds];
+  }
+
+  return userIds;
+};
+
+export const metaBeginTurn = ({
   meta,
   userIds,
-  value,
+  now,
+  expiresAt,
 }: {
   meta: Meta;
   userIds: UserId | UserId[] | "all";
-  value: boolean;
+  now: number;
+  expiresAt?: number;
 }): void => {
-  if (userIds === "all") {
-    userIds = meta.players.allIds;
-  } else if (!Array.isArray(userIds)) {
-    userIds = [userIds];
-  }
+  userIds = normalizeUserIds({ userIds, meta });
 
   for (const userId of userIds) {
     const player = meta.players.byId[userId];
     if (!player) {
       console.warn(
-        `Trying to set itsYourTurn for user ${userId} who is not in "meta"`,
+        `Trying to start turn for user ${userId} who is not in "meta"`,
       );
       continue;
     }
-    player.itsYourTurn = value;
+    player.itsYourTurn = true;
+    player.turnBeganAt = now;
+    player.turnExpiresAt = expiresAt;
+  }
+};
+
+export const metaEndTurn = ({
+  meta,
+  userIds,
+}: {
+  meta: Meta;
+  userIds: UserId | UserId[] | "all";
+}): void => {
+  userIds = normalizeUserIds({ userIds, meta });
+
+  for (const userId of userIds) {
+    const player = meta.players.byId[userId];
+    if (!player) {
+      console.warn(
+        `Trying to end turn for user ${userId} who is not in "meta"`,
+      );
+      continue;
+    }
+    player.itsYourTurn = false;
+    player.turnBeganAt = undefined;
+    player.turnExpiresAt = undefined;
   }
 };

@@ -7,8 +7,9 @@ import {
   MatchSettings,
   Meta,
   metaAddUserToMatch,
+  metaBeginTurn,
+  metaEndTurn,
   metaInitialState,
-  metaSetTurns,
   User,
   UserId,
   UsersState,
@@ -352,19 +353,30 @@ class Match extends EventTarget {
     }
 
     // Turns
-    metaSetTurns({
-      meta,
-      userIds: Array.from(result.beginTurnUsers),
-      value: true,
-    });
+    for (const [userId, { expiresAt }] of Object.entries(result.beginTurns)) {
+      metaBeginTurn({
+        meta,
+        now,
+        userIds: userId,
+        expiresAt,
+      });
+      this.store.users.byId[userId].turnBeganAt = now;
+      this.store.users.byId[userId].turnExpiresAt = expiresAt;
+    }
 
-    metaSetTurns({
+    metaEndTurn({
       meta,
       userIds: Array.from(result.endTurnUsers),
-      value: false,
     });
+    for (const userId of result.endTurnUsers) {
+      this.store.users.byId[userId].turnBeganAt = undefined;
+      this.store.users.byId[userId].turnExpiresAt = undefined;
+    }
 
-    if (result.beginTurnUsers.size > 0 || result.endTurnUsers.size > 0) {
+    if (
+      Object.keys(result.beginTurns).length > 0 ||
+      result.endTurnUsers.size > 0
+    ) {
       this.dispatchEvent(new CustomEvent("metaChanged"));
     }
 
@@ -373,7 +385,7 @@ class Match extends EventTarget {
       this._removeDelayedMoveForUser(userId);
     }
 
-    for (const userId of result.beginTurnUsers) {
+    for (const userId of Object.keys(result.beginTurns)) {
       this._removeDelayedMoveForUser(userId);
     }
 
