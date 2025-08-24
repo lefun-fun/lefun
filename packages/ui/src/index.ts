@@ -298,3 +298,34 @@ export function useStore<
 
 /* Convenience function to get a typed `useStore` hook. */
 export const makeUseStore = <GS extends GameStateBase>() => useStore<GS>;
+
+export const useUserTurn = <GS extends GameStateBase>(
+  userId?: UserId,
+  adjust: TimeAdjust = "before",
+):
+  | { beganAt: number; expiresAt: number | undefined }
+  // If we have no `beganAt` then there cannot be an `expiresAt`.
+  | { beganAt: undefined; expiresAt: undefined } => {
+  let expiresAt = useSelector((state: _MatchState<GS["B"], GS["PB"]>) => {
+    return userId ? state.users.byId[userId]?.turnExpiresAt : undefined;
+  });
+  let beganAt = useSelector((state: _MatchState<GS["B"], GS["PB"]>) => {
+    return userId ? state.users.byId[userId]?.turnBeganAt : undefined;
+  });
+
+  const toClientTime = useToClientTime<GS>();
+
+  if (beganAt === undefined) {
+    return { beganAt: undefined, expiresAt: undefined };
+  }
+
+  if (beganAt) {
+    beganAt = toClientTime(beganAt, adjust);
+  }
+
+  if (expiresAt) {
+    expiresAt = toClientTime(expiresAt, adjust);
+  }
+
+  return { beganAt, expiresAt };
+};

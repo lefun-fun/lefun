@@ -10,6 +10,7 @@ import {
   makeUseSelector,
   makeUseSelectorShallow,
   useUsername,
+  useUserTurn,
 } from "@lefun/ui";
 
 import { G, getCurrentPlayer, GS } from "./game";
@@ -28,9 +29,11 @@ function Player({ userId }: { userId: UserId }) {
     (state) => state.board.matchPlayersSettings[userId].color,
   );
 
-  const expiresAt = useSelector(
-    (state) => state.board.players[userId].expiresAt,
-  );
+  const { expiresAt } = useUserTurn(userId);
+  console.log("expiresAt", expiresAt);
+  // const expiresAt = useSelector(
+  //   (state) => state.board.players[userId].expiresAt,
+  // );
 
   const isDead = useSelector((state) => state.board.players[userId].isDead);
 
@@ -47,6 +50,8 @@ function Player({ userId }: { userId: UserId }) {
 }
 
 const CountDown = ({ ts }: { ts: number | undefined | null }) => {
+  console.log("countdown", ts);
+  console.log("ts - now", ts ? ts - new Date().getTime() : null);
   const [delta, setDelta] = useState<number | null>(null);
 
   useEffect(() => {

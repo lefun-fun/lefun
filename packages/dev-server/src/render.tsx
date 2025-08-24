@@ -117,6 +117,8 @@ const initMatch = ({
         isBot: false,
         // TODO We don't need to know if they are guests in here.
         isGuest: false,
+        turnBeganAt: undefined,
+        turnExpiresAt: undefined,
       },
     ]),
   );

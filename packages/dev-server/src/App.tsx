@@ -479,9 +479,17 @@ function MatchPlayerSettings({
 
   return (
     <div className="w-full">
-      <label className="text-black font-semibold text-center w-full">
-        {username}
-      </label>
+      <input
+        type="text"
+        className="text-black font-semibold w-full"
+        value={username}
+        onChange={() => {
+          // RENDU ICI `username` is a good candidate to test updating `meta`
+          // (or at least out-of-*boards values.
+          // this.match.store.users.byId[userId].username = e.target.value;
+          // Just like the new beganAt and expiresAt.
+        }}
+      />
       {gamePlayerSettings.allIds.map((key) => (
         <MatchPlayerSetting
           key={key}
@@ -724,31 +732,74 @@ function Settings() {
 const ItsMyTurn = ({ userId }: { userId: UserId }) => {
   const match = useStore((state) => state.match);
 
+  const ref = useRef<HTMLDivElement>(null);
+
   const [itsMyTurn, setItsMyTurn] = useState(
     () => match?.store.meta.players.byId[userId]?.itsYourTurn || false,
   );
+
+  const [width, setWidth] = useState(0);
 
   useEffect(() => {
     if (!match || userId === "spectator") {
       return;
     }
 
+    let i: NodeJS.Timeout;
+
     const handler = () => {
-      setItsMyTurn(match?.store.meta.players.byId[userId].itsYourTurn || false);
+      if (i) {
+        clearInterval(i);
+      }
+      const myTurn = match.store.meta.players.byId[userId].itsYourTurn || false;
+      setItsMyTurn(myTurn);
+
+      if (!myTurn) {
+        setWidth(0);
+        return;
+      }
+
+      const beganAt = match?.store.meta.players.byId[userId].turnBeganAt;
+      const expiresAt = match?.store.meta.players.byId[userId].turnExpiresAt;
+
+      if (expiresAt) {
+        i = setInterval(() => {
+          const totalWidth = ref.current?.clientWidth || 0;
+          const now = new Date().getTime();
+          if (!beganAt) {
+            console.warn("beganAt is undefined");
+            return;
+          }
+          const width = ((now - beganAt) / (expiresAt - beganAt)) * totalWidth;
+          setWidth(Math.min(width, totalWidth));
+        }, 50);
+      }
     };
     match.addEventListener("metaChanged", handler);
 
-    return () => match.removeEventListener("metaChanged", handler);
+    return () => {
+      match.removeEventListener("metaChanged", handler);
+      if (i) {
+        clearInterval(i);
+      }
+    };
   }, [match, userId]);
 
   return (
     <div
       className={classNames(
         "text-xs text-center",
-        "relative w-full h-4",
+        "relative w-full h-4 z-0",
         itsMyTurn ? "font-semibold bg-red-200" : "bg-gray-100",
       )}
+      ref={ref}
     >
+      {itsMyTurn && (
+        <div
+          className="absolute left-0 top-0 h-full bg-black opacity-10 z-10"
+          style={{ width }}
+        ></div>
+      )}
       {userId}
     </div>
   );

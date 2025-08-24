@@ -4,6 +4,8 @@ import {
   MatchSettings,
   Meta,
   metaAddUserToMatch,
+  metaBeginTurn,
+  metaEndTurn,
   metaInitialState,
   metaRemoveUserFromMatch,
   UserId,
@@ -391,19 +393,27 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
 
   _doMoveSideEffects({
     matchHasEnded,
-    beginTurnUsers,
+    beginTurns,
     endTurnUsers,
     delayedMoves,
     stats,
   }: {
     matchHasEnded: boolean;
-    beginTurnUsers: Set<UserId>;
+    beginTurns: Record<UserId, { expiresAt?: number }>;
     endTurnUsers: Set<UserId>;
     delayedMoves: DelayedMove[];
     stats: Stat[];
   }) {
-    for (const userId of beginTurnUsers) {
-      this.meta.players.byId[userId].itsYourTurn = true;
+    const { meta, time } = this;
+
+    for (const [userId, { expiresAt }] of Object.entries(beginTurns)) {
+      metaBeginTurn({
+        meta,
+        userIds: userId,
+        now: time,
+        expiresAt,
+      });
+
       // Clear previous turn player moves for that player: in other words only the
       // lastest `turns.begin` counts for a given player.
       this.delayedMoves = this.delayedMoves.filter(
@@ -412,7 +422,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     }
 
     for (const userId of endTurnUsers) {
-      this.meta.players.byId[userId].itsYourTurn = false;
+      metaEndTurn({ meta, userIds: userId });
       // Clear previous turn player moves for that player.
       this.delayedMoves = this.delayedMoves.filter(
         ({ userId: otherUserId }) => otherUserId !== userId,
@@ -469,18 +479,13 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     });
 
     {
-      const {
-        matchHasEnded,
-        delayedMoves,
-        beginTurnUsers,
-        endTurnUsers,
-        stats,
-      } = output;
+      const { matchHasEnded, delayedMoves, beginTurns, endTurnUsers, stats } =
+        output;
 
       this._doMoveSideEffects({
         matchHasEnded,
         delayedMoves,
-        beginTurnUsers,
+        beginTurns,
         endTurnUsers,
         stats,
       });
@@ -551,18 +556,13 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     }
 
     if (!error && output) {
-      const {
-        matchHasEnded,
-        delayedMoves,
-        beginTurnUsers,
-        endTurnUsers,
-        stats,
-      } = output;
+      const { matchHasEnded, delayedMoves, beginTurns, endTurnUsers, stats } =
+        output;
 
       this._doMoveSideEffects({
         matchHasEnded,
         delayedMoves,
-        beginTurnUsers,
+        beginTurns,
         endTurnUsers,
         stats,
       });

@@ -228,7 +228,7 @@ export function executePlayerMove<GS extends GameStateBase>({
 
 type SideEffectResults = {
   matchHasEnded: boolean;
-  beginTurnUsers: Set<UserId>;
+  beginTurns: Record<UserId, { expiresAt?: number }>;
   endTurnUsers: Set<UserId>;
   delayedMoves: DelayedMove[];
   stats: Stat[];
@@ -245,7 +245,7 @@ function defineMoveSideEffects<GS extends GameStateBase>({
 }): { sideEffectResults: SideEffectResults; moveSideEffects: MoveSideEffects } {
   const sideEffectResults: SideEffectResults = {
     matchHasEnded: false,
-    beginTurnUsers: new Set(),
+    beginTurns: {},
     endTurnUsers: new Set(),
     delayedMoves: [],
     stats: [],
@@ -263,10 +263,6 @@ function defineMoveSideEffects<GS extends GameStateBase>({
     userIds = parseTurnUserIds(userIds, {
       allUserIds: meta.players.allIds,
     });
-    for (const userId of userIds) {
-      sideEffectResults.beginTurnUsers.add(userId);
-      sideEffectResults.endTurnUsers.delete(userId);
-    }
 
     if (expiresIn !== undefined) {
       const ts = now + expiresIn;
@@ -305,6 +301,12 @@ function defineMoveSideEffects<GS extends GameStateBase>({
       }
       expiresAt = ts;
     }
+
+    for (const userId of userIds) {
+      sideEffectResults.beginTurns[userId] = { expiresAt };
+      sideEffectResults.endTurnUsers.delete(userId);
+    }
+
     return { expiresAt };
   };
 
@@ -314,7 +316,7 @@ function defineMoveSideEffects<GS extends GameStateBase>({
     });
     for (const userId of userIds) {
       sideEffectResults.endTurnUsers.add(userId);
-      sideEffectResults.beginTurnUsers.delete(userId);
+      delete sideEffectResults.beginTurns[userId];
     }
   };
 
