@@ -7,9 +7,13 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "format": "pnpm eslint packages games --fix; pnpm prettier --write .",
-    "lint": "pnpm eslint packages games --quiet; pnpm prettier --check .; pnpm check-types",
-    "check-types": "lerna exec --stream --parallel --no-bail -- tsc --skipLibCheck --pretty --noEmit"
+    "fix-eslint": "pnpm eslint packages games --fix",
+    "fix-prettier": "pnpm prettier --write .",
+    "fix": "pnpm fix-eslint && pnpm fix-prettier",
+    "check-prettier": "pnpm prettier --check .",
+    "check-eslint": "pnpm eslint packages games --quiet",
+    "check-types": "lerna exec --stream --parallel --no-bail -- tsc --skipLibCheck --pretty --noEmit",
+    "check": "pnpm check-eslint && pnpm check-prettier && pnpm check-types"
   },
   "dependencies": {
     "lerna": "^8.1.6"

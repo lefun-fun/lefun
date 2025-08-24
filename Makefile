@@ -14,19 +14,19 @@ test:
 watch:
 	pnpm lerna run watch --stream --parallel
 
-.PHONY: format
-format:
-	pnpm format
+.PHONY: check
+check:
+	pnpm check
 
-.PHONY:lint 
-lint:
-	pnpm lint
+.PHONY:fix 
+fix:
+	pnpm fix
 
 .PHONY: bump-version
 bump-version:
 	pnpm lerna version --force-publish --no-private --no-git-tag-version
-	$(MAKE) format
+	$(MAKE) fix
 
 .PHONY: publish
-publish: lint build test
+publish: check test build
 	pnpm publish --access public --filter=@lefun/*
