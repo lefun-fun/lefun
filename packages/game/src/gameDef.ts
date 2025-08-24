@@ -8,8 +8,8 @@ import {
   GameSettings_,
   GameStat,
   GameStats_,
+  If_ObjectOrNull_Null,
   IfAny,
-  IfAnyNull,
   IfNull,
   Locale,
   MatchPlayerSettings,
@@ -20,7 +20,11 @@ import {
 
 import { Random } from "./random";
 
-export type GameStateBase<B = any, PB = any, SB = any> = {
+export type GameStateBase<
+  B extends object = object,
+  PB extends object | null = object | null,
+  SB extends object | null = object | null,
+> = {
   B: B;
   PB: PB;
   SB: SB;
@@ -28,7 +32,13 @@ export type GameStateBase<B = any, PB = any, SB = any> = {
 
 export type MoveTypesBase = Record<string, any>;
 
-export type GameState<B, PB = null, SB = null> = GameStateBase<B, PB, SB>;
+export type GameState<
+  B extends object = object,
+  PB extends object | null = null,
+  SB extends object | null = null,
+> = GameStateBase<B, PB, SB>;
+
+export type GameStateAny = GameStateBase<any, any, any>;
 
 export type GameStats = GameStat[];
 
@@ -67,27 +77,36 @@ export type DelayMove<BMT extends MoveTypesBase = MoveTypesBase> = <
 
 type ValueOf<T> = T[keyof T];
 
+type BeginTurnOptions<
+  PMT extends MoveTypesBase = MoveTypesBase,
+  BMT extends MoveTypesBase = MoveTypesBase,
+> = {
+  expiresIn?: number;
+  boardMoveOnExpire?: IfAny<
+    ValueOf<BMT>,
+    string | [string, any],
+    MoveObjFromMT<BMT>
+  >;
+  playerMoveOnExpire?: IfAny<
+    ValueOf<PMT>,
+    string | [string, any],
+    MoveObjFromMT<PMT>
+  >;
+};
+
 export type Turns<
   PMT extends MoveTypesBase = MoveTypesBase,
   BMT extends MoveTypesBase = MoveTypesBase,
 > = {
-  end: (userIds: UserId | UserId[] | "all") => void;
+  end: (userIds: UserId | UserId[]) => void;
+  endAll: () => void;
   begin: (
-    userIds: UserId | UserId[] | "all",
-    options?: {
-      expiresIn?: number;
-      boardMoveOnExpire?: IfAny<
-        ValueOf<BMT>,
-        string | [string, any],
-        MoveObjFromMT<BMT>
-      >;
-      playerMoveOnExpire?: IfAny<
-        ValueOf<PMT>,
-        string | [string, any],
-        MoveObjFromMT<PMT>
-      >;
-    },
+    userIds: UserId | UserId[],
+    options?: BeginTurnOptions<PMT, BMT>,
   ) => { expiresAt: number | undefined };
+  beginAll: (options?: BeginTurnOptions<PMT, BMT>) => {
+    expiresAt: number | undefined;
+  };
 };
 
 type StatsKeys<S extends GameStats> = S extends { key: infer K }[] ? K : never;
@@ -284,7 +303,7 @@ export type AutoMoveInfo = {
 };
 
 export type GetPayload<
-  G extends Game,
+  G extends Game<GameStateAny>,
   K extends keyof G["playerMoves"] & string,
 > = IfAny<
   ValueOf<G["playerMoves"]>,
@@ -368,22 +387,27 @@ export type GetMatchScoreTextOptions<B> = {
 
 export type InitialBoardsOutput<GS extends GameStateBase> = {
   board: GS["B"];
-} & IfAnyNull<
+} & If_ObjectOrNull_Null<
   GS["PB"],
+  // object | null: we don't know
   { playerboards?: Record<UserId, GS["PB"]> },
-  unknown,
+  // null: `object` because we are doing the intersection of types here.
+  object,
+  // other we know it's defined we need the playerboards
   { playerboards: Record<UserId, GS["PB"]> }
 > &
-  IfAnyNull<
+  // Same logic as with G["PB"] above
+  If_ObjectOrNull_Null<
     GS["SB"],
     { secretboard?: GS["SB"] },
-    unknown,
+    object,
     { secretboard: GS["SB"] }
   >;
 
 export type InitialBoard<GS extends GameStateBase = GameStateBase> = (
   options: InitialBoardsOptions<GS["B"]>,
 ) => InitialBoardsOutput<GS>;
+
 // This is what the game developer must implement.
 export type Game<
   GS extends GameStateBase = GameStateBase,
@@ -471,7 +495,11 @@ function normalizeStats(stats: GameStats | undefined): GameStats_ {
     // Remove redondant keys.
     byId: Object.fromEntries(
       allIds.map((key) => {
-        const { type, ordering = "higherIsBetter" } = byId[key];
+        const value = byId[key];
+        if (!value) {
+          throw new Error("value should be defined");
+        }
+        const { type, ordering = "higherIsBetter" } = value;
         return [key, { key, type, ordering }];
       }),
     ),
@@ -499,6 +527,9 @@ function normalizeSettings(settings: GameSettings | GamePlayerSettings) {
   // Find the default values.
   for (const key of newSettings.allIds) {
     const gameSetting = newSettings.byId[key];
+    if (gameSetting === undefined) {
+      throw new Error("game setting should be defined");
+    }
 
     let defaultValue: string | null = null;
     let numDefault = 0;
@@ -515,7 +546,7 @@ function normalizeSettings(settings: GameSettings | GamePlayerSettings) {
     }
 
     (gameSetting as GameSetting_).defaultValue =
-      defaultValue ?? gameSetting.options[0].value;
+      defaultValue ?? gameSetting.options[0]?.value ?? "";
   }
 
   return newSettings;

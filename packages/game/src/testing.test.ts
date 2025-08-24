@@ -81,7 +81,7 @@ describe("turns", () => {
   test("playerMoveOnExpire", () => {
     const match = new MatchTester<GS, G>({ game, numPlayers: 1 });
 
-    const userId = match.meta.players.allIds[0];
+    const userId = match.meta.players.allIds[0]!;
     expect(match.board.expiresAt).toBe(undefined);
 
     // I make a move
@@ -139,7 +139,7 @@ describe("turns", () => {
 
   test("executes moves with delay 0 right away", () => {
     const match = new MatchTester<GS, G>({ game, numPlayers: 1 });
-    const userId = match.meta.players.allIds[0];
+    const userId = match.meta.players.allIds[0]!;
     match.makeMove(userId, "beginWithDelay", { delay: 0 });
     expect(match.board.numZeroDelay).toBe(10);
     expect(match.matchHasEnded).toBe(true);
@@ -147,7 +147,7 @@ describe("turns", () => {
 
   test("executes moves with delay 1", () => {
     const match = new MatchTester<GS, G>({ game, numPlayers: 1 });
-    const userId = match.meta.players.allIds[0];
+    const userId = match.meta.players.allIds[0]!;
     match.makeMove(userId, "beginWithDelay", { delay: 1 });
     match.fastForward(1);
     expect(match.board.numZeroDelay).toBe(10);
@@ -157,7 +157,7 @@ describe("turns", () => {
   test("expiresAt", () => {
     const match = new MatchTester<GS, G>({ game, numPlayers: 1 });
 
-    const userId = match.meta.players.allIds[0];
+    const userId = match.meta.players.allIds[0]!;
     expect(match.board.expiresAt).toBe(undefined);
 
     match.makeMove(userId, "go", {});
@@ -190,7 +190,7 @@ describe("turns", () => {
     } satisfies Game<GS>;
 
     const match = new MatchTester<GS, typeof game>({ game, numPlayers: 1 });
-    const userId = match.meta.players.allIds[0];
+    const userId = match.meta.players.allIds[0]!;
     match.makeMove(userId, "begin", { onExpire: "a" });
     expect(match.board.x).toBe("");
     match.fastForward(10);
@@ -337,7 +337,7 @@ test("error in move does not get applied", () => {
 
   const match = new MatchTester<GS, typeof game>({ game, numPlayers: 1 });
 
-  const userId = match.meta.players.allIds[0];
+  const userId = match.meta.players.allIds[0]!;
 
   expect(() => {
     match.makeMove(userId, "incrementWithError");
@@ -366,7 +366,7 @@ test("canFail", () => {
 
   const match = new MatchTester<GS, typeof game>({ game, numPlayers: 1 });
 
-  const userId = match.meta.players.allIds[0];
+  const userId = match.meta.players.allIds[0]!;
 
   match.makeMove(userId, "go", null, { canFail: true });
 
@@ -392,8 +392,8 @@ test("end match ends turns", () => {
   } satisfies Game;
 
   const match = new MatchTester({ game, numPlayers: 1 });
-  const userId = match.meta.players.allIds[0];
+  const userId = match.meta.players.allIds[0]!;
   match.makeMove(userId, "go");
   expect(match.matchHasEnded).toBe(true);
-  expect(match.meta.players.byId[userId].itsYourTurn).toBe(false);
+  expect(match.meta.players.byId[userId]?.itsYourTurn).toBe(false);
 });

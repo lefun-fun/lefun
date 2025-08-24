@@ -21,15 +21,6 @@ export interface Player {
   // When in the lobby, are we ready to start. When everyone is ready the game starts.
   ready: boolean;
 
-  // Score for the player at the end of the match.
-  // What it means depends on the type of score as defined in the Game.
-  // See
-  score?: number;
-
-  // Rank of the player for the match. Even though this can be deduced
-  // from the `score`, having it here makes que user stats per rank easy to fetch.
-  rank?: number;
-
   // Is it this player's turn?
   // This is used to:
   // * Trigger the "it's your turn" sounds
@@ -37,13 +28,21 @@ export interface Player {
   // * It is NOT used to check for permission of making moves
   itsYourTurn: boolean;
 
-  // After coming out of the internet the date is in a string.
-  joinedAt: Date | string;
+  // `undefined` when it's not our turn and for backward compatibility
+  // (older matches won't have that field).
+  turnBeganAt?: number;
+
+  // `undefined` when it's not our turn and for backward compatibility
+  turnExpiresAt?: number;
 
   // Is the player voting to end the match?
   votesToEndMatch?: boolean;
 
   // Is it a bot?
+  // TODO: deprecate this, `meta` shouldn't care if the player is a bot or human
+  // That info should go in the separate `User` data, along with the username.
+  // The logic is that we should be able to swap a human player with a bot without
+  // changing `meta`.
   isBot: boolean;
 }
 
@@ -52,10 +51,6 @@ export type Meta = {
   players: Players;
   matchSettings: MatchSettings;
   matchPlayersSettings: MatchPlayersSettings;
-
-  // Score for the match. This makes sense for collaborative/solo matches. We could put
-  // the best score in the "game" page.
-  score?: number;
 
   // Kept for backward compatibility, those are not used anymore.
   settings?: {
@@ -91,7 +86,6 @@ export const metaInitialState = ({
 export const metaAddUserToMatch = ({
   meta,
   userId,
-  ts,
   matchPlayerSettings = {},
   isBot,
 }: {
@@ -115,7 +109,7 @@ export const metaAddUserToMatch = ({
   } else {
     index = 0;
     for (const otherUserId of meta.players.allIds) {
-      if (meta.players.byId[otherUserId].isBot) {
+      if (meta.players.byId[otherUserId]?.isBot) {
         break;
       }
       index++;
@@ -125,7 +119,6 @@ export const metaAddUserToMatch = ({
   meta.players.byId[userId] = {
     ready: true,
     itsYourTurn: false,
-    joinedAt: ts,
     isBot,
   };
   meta.players.allIds.splice(index, 0, userId);
@@ -146,29 +139,42 @@ export const metaRemoveUserFromMatch = (meta: Meta, userId: UserId): void => {
   meta.players.allIds.splice(idx, 1);
 };
 
-export const metaSetTurns = ({
+export const metaBeginTurn = ({
   meta,
-  userIds,
-  value,
+  userId,
+  beginsAt,
+  expiresAt,
 }: {
   meta: Meta;
-  userIds: UserId | UserId[] | "all";
-  value: boolean;
+  userId: UserId;
+  beginsAt: number;
+  expiresAt?: number;
 }): void => {
-  if (userIds === "all") {
-    userIds = meta.players.allIds;
-  } else if (!Array.isArray(userIds)) {
-    userIds = [userIds];
+  const player = meta.players.byId[userId];
+  if (!player) {
+    console.warn(
+      `Trying to start turn for user ${userId} who is not in "meta"`,
+    );
+    return;
   }
+  player.itsYourTurn = true;
+  player.turnBeganAt = beginsAt;
+  player.turnExpiresAt = expiresAt;
+};
 
-  for (const userId of userIds) {
-    const player = meta.players.byId[userId];
-    if (!player) {
-      console.warn(
-        `Trying to set itsYourTurn for user ${userId} who is not in "meta"`,
-      );
-      continue;
-    }
-    player.itsYourTurn = value;
+export const metaEndTurn = ({
+  meta,
+  userId,
+}: {
+  meta: Meta;
+  userId: UserId;
+}): void => {
+  const player = meta.players.byId[userId];
+  if (!player) {
+    console.warn(`Trying to end turn for user ${userId} who is not in "meta"`);
+    return;
   }
+  player.itsYourTurn = false;
+  player.turnBeganAt = undefined;
+  player.turnExpiresAt = undefined;
 };

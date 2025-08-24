@@ -1,9 +1,12 @@
 import {
   Locale,
   MatchPlayerSettings,
+  MatchPlayersSettings,
   MatchSettings,
   Meta,
   metaAddUserToMatch,
+  metaBeginTurn,
+  metaEndTurn,
   metaInitialState,
   metaRemoveUserFromMatch,
   UserId,
@@ -65,14 +68,6 @@ export type BotTrainingLogItem =
 
 type EmptyObject = Record<string, never>;
 
-type User = {
-  username: string;
-  isBot: boolean;
-  isGuest: boolean;
-};
-
-type UsersState = { byId: Record<UserId, User> };
-
 type MakeMoveOptions = { canFail?: boolean; isDelayed?: boolean };
 
 type MakeMoveRest<
@@ -102,11 +97,10 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
   board: GS["B"];
   playerboards: Record<UserId, GS["PB"]>;
   secretboard: GS["SB"];
-  users: UsersState;
   matchHasEnded: boolean;
   random: Random;
-  matchSettings;
-  matchPlayersSettings;
+  matchSettings: MatchSettings;
+  matchPlayersSettings: MatchPlayersSettings;
   // Clock used for delayedMoves - in ms.
   time: number;
   // List of timers to be executed.
@@ -190,7 +184,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
         }
         // If there was no option marked as `default`, we use the first one.
         if (!thereWasADefault) {
-          matchSettings[key] = options[0].value;
+          matchSettings[key] = options[0]!.value;
         }
       }
     }
@@ -204,14 +198,17 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
         const opts: MatchPlayerSettings = {};
         gamePlayerSettings.allIds.forEach((key) => {
           const optionDef = gamePlayerSettings.byId[key];
+          if (!optionDef) {
+            throw new Error("option def is falsy");
+          }
           if (optionDef.exclusive) {
             // For each user, given them the n-th option. Loop if there are less options
             // than players.
             opts[key] =
-              optionDef.options[nthUser % optionDef.options.length].value;
+              optionDef.options[nthUser % optionDef.options.length]!.value;
           } else {
             // TODO We probably need a default option here!
-            opts[key] = optionDef.options[0].value;
+            opts[key] = optionDef.options[0]!.value;
           }
         });
         matchPlayersSettingsArr.push(opts);
@@ -221,14 +218,14 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     const matchPlayersSettings = Object.fromEntries(
       meta.players.allIds.map((userId, i) => [
         userId,
-        matchPlayersSettingsArr ? matchPlayersSettingsArr[i] : {},
+        matchPlayersSettingsArr ? matchPlayersSettingsArr[i]! : {},
       ]),
     );
 
     const areBots = Object.fromEntries(
       meta.players.allIds.map((userId) => [
         userId,
-        meta.players.byId[userId].isBot,
+        meta.players.byId[userId]!.isBot,
       ]),
     );
 
@@ -253,15 +250,6 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
       secretboard = {},
     } = init as InitialBoardsOutput<GameStateBase>;
 
-    const users: UsersState = { byId: {} };
-    meta.players.allIds.forEach((userId) => {
-      users.byId[userId] = {
-        username: `User ${userId}`,
-        isGuest: false,
-        isBot: false,
-      };
-    });
-
     this.autoMove = autoMove;
     this.getAgent = getAgent;
     this.gameData = gameData;
@@ -274,7 +262,6 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     this.meta = meta;
     this.time = time;
     this.delayedMoves = [];
-    this.users = users;
     this.matchSettings = matchSettings;
     this.matchPlayersSettings = matchPlayersSettings;
     this._sameBotCount = 0;
@@ -312,9 +299,8 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
       random,
     } = this;
     const userId = `userId-${this.nextUserId}`;
-    const username = `Player ${this.nextUserId}`;
     const isBot = false;
-    const isGuest = false;
+
     this.nextUserId++;
     metaAddUserToMatch({ meta, userId, ts: new Date(), isBot });
 
@@ -332,12 +318,6 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
 
     // Trigger the game's logic.
     this._makeBoardMove(ADD_PLAYER, { userId });
-
-    this.users.byId[userId] = {
-      username,
-      isBot,
-      isGuest,
-    };
 
     return userId;
   }
@@ -375,7 +355,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
 
     // It's no-one's turn anymore.
     this.meta.players.allIds.forEach((userId) => {
-      this.meta.players.byId[userId].itsYourTurn = false;
+      this.meta.players.byId[userId]!.itsYourTurn = false;
     });
     this._isPlaying = false;
   }
@@ -391,19 +371,27 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
 
   _doMoveSideEffects({
     matchHasEnded,
-    beginTurnUsers,
-    endTurnUsers,
+    beginTurn,
+    endTurn,
     delayedMoves,
     stats,
   }: {
     matchHasEnded: boolean;
-    beginTurnUsers: Set<UserId>;
-    endTurnUsers: Set<UserId>;
+    beginTurn: Record<UserId, { expiresAt?: number }>;
+    endTurn: Record<UserId, null>;
     delayedMoves: DelayedMove[];
     stats: Stat[];
   }) {
-    for (const userId of beginTurnUsers) {
-      this.meta.players.byId[userId].itsYourTurn = true;
+    const { meta, time } = this;
+
+    for (const [userId, { expiresAt }] of Object.entries(beginTurn)) {
+      metaBeginTurn({
+        meta,
+        userId,
+        beginsAt: time,
+        expiresAt,
+      });
+
       // Clear previous turn player moves for that player: in other words only the
       // lastest `turns.begin` counts for a given player.
       this.delayedMoves = this.delayedMoves.filter(
@@ -411,8 +399,8 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
       );
     }
 
-    for (const userId of endTurnUsers) {
-      this.meta.players.byId[userId].itsYourTurn = false;
+    for (const userId of Object.keys(endTurn)) {
+      metaEndTurn({ meta, userId });
       // Clear previous turn player moves for that player.
       this.delayedMoves = this.delayedMoves.filter(
         ({ userId: otherUserId }) => otherUserId !== userId,
@@ -469,19 +457,13 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     });
 
     {
-      const {
-        matchHasEnded,
-        delayedMoves,
-        beginTurnUsers,
-        endTurnUsers,
-        stats,
-      } = output;
+      const { matchHasEnded, delayedMoves, beginTurn, endTurn, stats } = output;
 
       this._doMoveSideEffects({
         matchHasEnded,
         delayedMoves,
-        beginTurnUsers,
-        endTurnUsers,
+        beginTurn,
+        endTurn,
         stats,
       });
     }
@@ -551,19 +533,13 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     }
 
     if (!error && output) {
-      const {
-        matchHasEnded,
-        delayedMoves,
-        beginTurnUsers,
-        endTurnUsers,
-        stats,
-      } = output;
+      const { matchHasEnded, delayedMoves, beginTurn, endTurn, stats } = output;
 
       this._doMoveSideEffects({
         matchHasEnded,
         delayedMoves,
-        beginTurnUsers,
-        endTurnUsers,
+        beginTurn,
+        endTurn,
         stats,
       });
 
@@ -593,9 +569,9 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     // Initialize agents.
     if (getAgent) {
       for (const userId of meta.players.allIds) {
-        if (meta.players.byId[userId].isBot) {
+        if (meta.players.byId[userId]!.isBot) {
           _agents[userId] = await getAgent({
-            matchPlayerSettings: matchPlayersSettings[userId],
+            matchPlayerSettings: matchPlayersSettings[userId]!,
             matchSettings,
             numPlayers,
           });
@@ -624,8 +600,8 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
       userIndex < meta.players.allIds.length;
       ++userIndex
     ) {
-      const userId = meta.players.allIds[userIndex];
-      const { isBot, itsYourTurn } = meta.players.byId[userId];
+      const userId = meta.players.allIds[userIndex]!;
+      const { isBot, itsYourTurn } = meta.players.byId[userId]!;
 
       if (isBot && itsYourTurn) {
         let boardRepr: string | undefined = undefined;
@@ -646,7 +622,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
 
         const args = {
           board,
-          playerboard: playerboards[userId],
+          playerboard: playerboards[userId]!,
           secretboard,
           userId,
           random,
@@ -713,17 +689,6 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     this._sameBotCount = 0;
   }
 
-  // State as `client` or `@lefun/ui-testing` expect it.
-  getState(userId: UserId) {
-    const { board, playerboards, users } = this;
-    return {
-      board,
-      userId,
-      playerboard: playerboards[userId],
-      users,
-    };
-  }
-
   /*
    * With this function we simulate passing time and execute delayedUpdates
    *
@@ -739,7 +704,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
 
     // Fast forward in increments, according to the delay moves that we have in store.
     // Otherwise they might happen at the wrong timestamp.
-    const nextDelayedMove = this.delayedMoves[0];
+    const nextDelayedMove = this.delayedMoves[0]!;
 
     const { ts } = nextDelayedMove;
     const timeToNextDelayedMove = ts - this.time;

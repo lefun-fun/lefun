@@ -8,7 +8,7 @@ import { createStore as _createStore, useStore as _useStore } from "zustand";
 import type { Locale, UserId } from "@lefun/core";
 import { Game_ } from "@lefun/game";
 
-import type { Match } from "./match";
+import type { Backend } from "./backend";
 
 const KEYS_TO_LOCAL_STORAGE: (keyof State)[] = [
   "visibleUserId",
@@ -32,7 +32,7 @@ type State = {
   locales: Locale[];
   view: View;
   game: Game_;
-  match: Match | undefined;
+  match: Backend | undefined;
   //
   toggleShowDimensions: () => void;
   toggleCollapsed: () => void;
@@ -68,13 +68,11 @@ function createStore({ locales, game }: { locales: Locale[]; game: Game_ }) {
     layout: "row",
     visibleUserId: "all",
     showDimensions: false,
-    locale: locales[0],
+    locale: locales[0] || "en",
     locales,
     view: "game",
     match: undefined,
     game,
-    //
-    meta: undefined,
     //
     resetMatch: () => {
       // This is set in App.tsx

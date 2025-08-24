@@ -1,23 +1,14 @@
 import { useMemo } from "react";
 
-import type { IfAnyNull, MatchState as _MatchState, UserId } from "@lefun/core";
-import type { Game, GameStateBase, GetPayload } from "@lefun/game";
+import type { IfAnyNull, Meta, UserId } from "@lefun/core";
+import type {
+  Game,
+  GameStateAny,
+  GameStateBase,
+  GetPayload,
+} from "@lefun/game";
 
-// In the selectors, assume that the boards are defined. We will add a check in the
-// client code to make sure this is true.
-export type MatchState<GS extends GameStateBase = GameStateBase> = _MatchState<
-  GS["B"],
-  GS["PB"]
-> & {
-  userId: UserId;
-  board: GS["B"];
-  // We need this to be optional because of spectators.
-  playerboard?: GS["PB"];
-};
-
-export type Selector<GS extends GameStateBase, T> = (
-  state: MatchState<GS>,
-) => T;
+export type Selector<GS extends GameStateBase, T> = (state: UIState<GS>) => T;
 
 export type MakeMove<G extends Game> = <
   K extends keyof G["playerMoves"] & string,
@@ -45,18 +36,18 @@ export function setMakeMove(makeMove: MakeMoveFull<Game>) {
   _makeMove = makeMove;
 }
 
-export type UseSelector = <GS extends GameStateBase, T>(
+export type UseSelector<GS extends GameStateBase> = <T>(
   selector: Selector<GS, T>,
 ) => T;
 
-let _useSelector: UseSelector | null = null;
-let _useSelectorShallow: UseSelector | null = null;
+let _useSelector: UseSelector<GameStateBase> | null = null;
+let _useSelectorShallow: UseSelector<GameStateBase> | null = null;
 
-export function setUseSelector(arg0: () => UseSelector) {
+export function setUseSelector(arg0: () => UseSelector<GameStateBase>) {
   _useSelector = arg0();
 }
 
-export function setUseSelectorShallow(arg0: () => UseSelector) {
+export function setUseSelectorShallow(arg0: () => UseSelector<GameStateBase>) {
   _useSelectorShallow = arg0();
 }
 
@@ -71,7 +62,7 @@ export function useSelector<GS extends GameStateBase, T>(
       `"useSelector" not defined by the host. Did you forget to call \`setUseSelector\`?`,
     );
   }
-  return _useSelector(selector);
+  return _useSelector(selector as Selector<GameStateBase, T>);
 }
 
 export function useSelectorShallow<GS extends GameStateBase, T>(
@@ -82,7 +73,7 @@ export function useSelectorShallow<GS extends GameStateBase, T>(
       `"useShallowSelector" not defined by the host. Did you forget to call \`setUseShallowSelector\`?`,
     );
   }
-  return _useSelectorShallow(selector);
+  return _useSelectorShallow(selector as Selector<GameStateBase, T>);
 }
 
 /* Util to "curry" the types of useSelector<...> */
@@ -96,7 +87,7 @@ export const makeUseSelectorShallow =
   <T>(selector: Selector<GS, T>) =>
     useSelectorShallow<GS, T>(selector);
 
-export function useMakeMove<G extends Game = Game>(): MakeMove<G> {
+export function useMakeMove<G extends Game<GameStateAny>>(): MakeMove<G> {
   if (!_makeMove) {
     throw new Error(
       '"makeMove" not defined by the host. Did you forget to call `setMakeMove`?',
@@ -126,7 +117,7 @@ export function useMakeMove<G extends Game = Game>(): MakeMove<G> {
   }, []);
 }
 
-export function makeUseMakeMove<G extends Game>() {
+export function makeUseMakeMove<G extends Game<GameStateAny>>() {
   return useMakeMove<G>;
 }
 
@@ -135,11 +126,9 @@ export function makeUseMakeMove<G extends Game>() {
  */
 export const useIsPlayer = <GS extends GameStateBase>() => {
   // Currently, the user is a player iif its playerboard is defined.
-  const hasPlayerboard = useSelector(
-    (state: _MatchState<GS["B"], GS["PB"]>) => {
-      return !!state.playerboard;
-    },
-  );
+  const hasPlayerboard = useSelector((state: UIState<GS>) => {
+    return !!state.playerboard;
+  });
   return hasPlayerboard;
 };
 
@@ -181,35 +170,16 @@ const toClientTime =
  *  has happened. This can be useful if you want some action from the server to happen
  *  exactly when a countdown gets to 0.
  */
-export const useToClientTime = <GS extends GameStateBase>() => {
+export const useToClientTime = () => {
   const delta = useSelector(
-    (state: _MatchState<GS["B"], GS["PB"]>) => state.timeDelta || 0,
+    (state: UIState<GameStateBase>) => state.timeDelta || 0,
   );
   const latency = useSelector(
-    (state: _MatchState<GS["B"], GS["PB"]>) => state.timeLatency || 0,
+    (state: UIState<GameStateBase>) => state.timeLatency || 0,
   );
 
   return toClientTime(delta, latency);
 };
-
-/*
- * Similar to `useToClientTime` but calls the returned function once without any state
- * watching. This is useful when we are already updating some state at regular intervals.
- */
-/*
- 
- If we want to be able to use this, we'll need a way to set the store outside of the
- Context, which require using a hook.
-
-export function getClientTime(
-  tsNumOrDate: Date | number,
-  adjust: TimeAdjust,
-): number {
-  const delta = _store.getState().timeDelta || 0;
-  const latency = _store.getState().timeLatency || 0;
-  return toClientTime(delta, latency)(tsNumOrDate, adjust);
-}
-*/
 
 /*
  * Util to play a sound
@@ -230,8 +200,8 @@ export const playSound = (name: string) => {
 export const useUsername = <GS extends GameStateBase>(
   userId?: UserId,
 ): string | undefined => {
-  const username = useSelector((state: _MatchState<GS["B"], GS["PB"]>) => {
-    return userId ? state.users.byId[userId]?.username : undefined;
+  const username = useSelector((state: UIState<GS>) => {
+    return userId ? state.users[userId]?.username : undefined;
   });
   return username;
 };
@@ -241,8 +211,8 @@ export const useUsername = <GS extends GameStateBase>(
  */
 export const useUsernames = (): Record<UserId, string> => {
   // Note the shallow-compared selector.
-  const usernames = useSelectorShallow((state: _MatchState) => {
-    const users = state.users.byId;
+  const usernames = useSelectorShallow((state: UIState<GameStateBase>) => {
+    const { users } = state;
     const usernames: { [userId: string]: string } = {};
     for (const [userId, { username }] of Object.entries(users)) {
       usernames[userId] = username;
@@ -262,14 +232,14 @@ export const useMyUserId = () => {
 
 // This has an awkward API for backward compatibility reasons.
 export type _Store<GS extends GameStateBase> = {
-  getState(): MatchState<GS>;
+  getState(): UIState<GS>;
 };
 
 export type UseStore<GS extends GameStateBase = GameStateBase> = _Store<GS>;
 
-let _useStore: UseStore | null = null;
+let _useStore: UseStore<any> | null = null;
 
-export const setUseStore = (arg0: () => MatchState) => {
+export const setUseStore = (arg0: () => UIState<GameStateBase>) => {
   _useStore = {
     getState() {
       return arg0();
@@ -298,3 +268,66 @@ export function useStore<
 
 /* Convenience function to get a typed `useStore` hook. */
 export const makeUseStore = <GS extends GameStateBase>() => useStore<GS>;
+
+export const useUserTurn = (
+  userId?: UserId,
+  adjust: TimeAdjust = "before",
+):
+  | { itsTheirTurn: boolean; beganAt: number; expiresAt: number | undefined }
+  // If we have no `beganAt` then there cannot be an `expiresAt`.
+  | { itsTheirTurn: boolean; beganAt: undefined; expiresAt: undefined } => {
+  let expiresAt = useSelector((state: UIState<GameStateBase>) => {
+    return userId ? state.meta.players.byId[userId]?.turnExpiresAt : undefined;
+  });
+  let beganAt = useSelector((state: UIState<GameStateBase>) => {
+    return userId ? state.meta.players.byId[userId]?.turnBeganAt : undefined;
+  });
+
+  const toClientTime = useToClientTime();
+
+  if (beganAt === undefined) {
+    return {
+      itsTheirTurn: !!beganAt,
+      beganAt: undefined,
+      expiresAt: undefined,
+    };
+  }
+
+  if (beganAt) {
+    beganAt = toClientTime(beganAt, adjust);
+  }
+
+  if (expiresAt) {
+    expiresAt = toClientTime(expiresAt, adjust);
+  }
+
+  return { itsTheirTurn: !!beganAt, beganAt, expiresAt };
+};
+
+export type User = { username: string };
+
+export type Users = Record<UserId, User>;
+
+/*
+ * State of the match as seen from a player.
+ * This is what the game UI has access to.
+ * Note that there is a version with less `undefined` values in `@lefun/ui`, for use by
+ * game developers.
+ */
+export type UIState<GS extends GameStateBase = GameStateBase> = {
+  // The player's userid
+  userId: UserId;
+
+  // The non-match related info required about the human users in the match.
+  users: Users;
+
+  board: GS["B"];
+  // `playerboard is `null` for spectators.
+  // Note that GS['PB'] can itself be `null` for games without playerboards.
+  playerboard: GS["PB"] | null;
+  meta: Meta;
+
+  // Timing info with respect to the
+  timeDelta: number;
+  timeLatency: number;
+};

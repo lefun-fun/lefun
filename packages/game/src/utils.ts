@@ -1,18 +1,3 @@
-import type { UserId } from "@lefun/core";
-
-export const parseTurnUserIds = (
-  userIds: UserId | UserId[] | "all",
-  { allUserIds }: { allUserIds: UserId[] },
-): UserId[] => {
-  if (userIds === "all") {
-    userIds = allUserIds;
-  }
-  if (!Array.isArray(userIds)) {
-    userIds = [userIds];
-  }
-  return userIds;
-};
-
 /*
  * 'move' | ['move', payload] => {name: 'move', payload}
  */

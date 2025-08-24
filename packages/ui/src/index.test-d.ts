@@ -5,6 +5,8 @@ import type { BoardMove, Game, GameState, PlayerMove } from "@lefun/game";
 import { makeUseMakeMove, useMakeMove } from "./index";
 
 test("makeMove - payload-typed", () => {
+  type GS = GameState<{ x: number }>;
+
   const move1: PlayerMove<GS, null> = {
     executeNow: ({ payload }) => {
       console.log(payload);
@@ -16,8 +18,6 @@ test("makeMove - payload-typed", () => {
       //
     },
   };
-
-  type GS = GameState<{ x: number }>;
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const game = {

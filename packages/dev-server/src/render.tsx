@@ -10,14 +10,14 @@ import type {
   MatchPlayersSettings,
   MatchSettings,
 } from "@lefun/core";
-import { Game, Game_, INIT_MOVE, parseGame } from "@lefun/game";
+import { Game, Game_, GameStateAny, INIT_MOVE, parseGame } from "@lefun/game";
 
 import { AllMessages, BoardForPlayer, Lefun, Main, RulesWrapper } from "./App";
 import {
-  loadMatchFromLocalStorage,
-  Match,
-  saveMatchToLocalStorage,
-} from "./match";
+  Backend,
+  loadBackendFromLocalStorage,
+  saveBackendToLocalStorage,
+} from "./backend";
 import { createStore, MainStoreContext } from "./store";
 
 function getUserIds(numPlayers: number) {
@@ -26,7 +26,7 @@ function getUserIds(numPlayers: number) {
     .map((_, i) => i.toString());
 }
 
-const initMatch = ({
+const initBackend = ({
   game,
   gameId,
   matchData,
@@ -44,8 +44,7 @@ const initMatch = ({
   matchSettings?: MatchSettings;
   matchPlayersSettings?: MatchPlayersSettings;
   numPlayers?: number;
-}) => {
-  console.log("init", numPlayers);
+}): Backend => {
   numPlayers ??= game.minPlayers;
   locale ??= "en";
 
@@ -57,7 +56,7 @@ const initMatch = ({
     if (gameSettings) {
       matchSettings = Object.fromEntries(
         gameSettings.allIds.map((key) => {
-          const defaultValue = gameSettings.byId[key].defaultValue;
+          const defaultValue = gameSettings.byId[key]!.defaultValue;
           return [key, defaultValue];
         }),
       );
@@ -76,20 +75,20 @@ const initMatch = ({
       for (const key of gamePlayerSettings.allIds) {
         const taken = new Set();
 
-        const { exclusive, options } = gamePlayerSettings.byId[key];
+        const { exclusive, options } = gamePlayerSettings.byId[key]!;
 
         for (const userId of userIds) {
           let found = false;
           for (const { value, isDefault } of options) {
             if (exclusive && !taken.has(value)) {
-              matchPlayersSettings[userId][key] = value;
+              matchPlayersSettings[userId]![key] = value;
               taken.add(value);
               found = true;
               break;
             }
 
             if (isDefault && !exclusive) {
-              matchPlayersSettings[userId][key] = value;
+              matchPlayersSettings[userId]![key] = value;
               found = true;
               break;
             }
@@ -101,7 +100,7 @@ const initMatch = ({
               );
             } else {
               // Fallback on the first option.
-              matchPlayersSettings[userId][key] = options[0].value;
+              matchPlayersSettings[userId]![key] = options[0]!.value;
             }
           }
         }
@@ -109,22 +108,13 @@ const initMatch = ({
     }
   }
 
-  const players = Object.fromEntries(
-    userIds.map((userId) => [
-      userId,
-      {
-        username: `Player ${userId}`,
-        isBot: false,
-        // TODO We don't need to know if they are guests in here.
-        isGuest: false,
-      },
-    ]),
-  );
+  const players = userIds.map((userId) => ({
+    userId,
+    username: `Player ${userId}`,
+    isBot: false,
+  }));
 
-  console.log("players before ctr");
-  console.log(players);
-
-  const match = new Match({
+  const backend = new Backend({
     game,
     gameId,
     matchSettings,
@@ -135,7 +125,7 @@ const initMatch = ({
     locale,
   });
 
-  return match;
+  return backend;
 };
 
 async function render({
@@ -146,9 +136,9 @@ async function render({
   matchData,
   gameData,
   idName = "home",
-  messages = { en: {} },
+  messages = { en: {}, fr: {} },
 }: {
-  game: Game;
+  game: Game<GameStateAny>;
   gameId: GameId;
   board: () => Promise<ReactNode>;
   rules?: () => Promise<ReactNode>;
@@ -187,14 +177,14 @@ async function render({
 
   // Is it the player's board?
   if (userId !== null) {
-    const match = ((window.top as any).lefun as Lefun).match;
+    const backend = ((window.top as any).lefun as Lefun).backend;
 
     const component = await board();
 
     const content = (
       <BoardForPlayer
         BoardComponent={() => component}
-        match={match}
+        backend={backend}
         userId={userId}
         messages={messages[locale]}
         locale={locale}
@@ -233,49 +223,49 @@ async function render({
     matchSettings?: MatchSettings;
     matchPlayersSettings?: MatchPlayersSettings;
   } = {}) => {
-    let match = store.getState().match;
+    let backend = store.getState().match;
 
-    match = initMatch({
+    backend = initBackend({
       game: game_,
       gameId,
       matchData,
       gameData,
-      locale: locale || match?.store.meta.locale,
-      numPlayers: numPlayers || match?.store.meta.players.allIds.length,
-      matchSettings: matchSettings || match?.store.matchSettings,
+      locale: locale || backend?.store.meta.locale,
+      numPlayers: numPlayers || backend?.store.meta.players.allIds.length,
+      matchSettings: matchSettings || backend?.store.matchSettings,
       matchPlayersSettings:
         matchPlayersSettings ||
         (numPlayers === undefined
-          ? match?.store.matchPlayersSettings
+          ? backend?.store.matchPlayersSettings
           : undefined),
     });
 
     // We use `window.lefun` to communicate between the host and the player boards.
-    (window as any).lefun = { match };
+    (window as any).lefun = { backend };
 
-    saveMatchToLocalStorage(match, gameId);
+    saveBackendToLocalStorage(backend, gameId);
 
-    store.setState(() => ({ match }));
+    store.setState(() => ({ match: backend }));
 
     // Start the match with the first "INIT_MOVE" board move.
-    match.makeBoardMove(INIT_MOVE, {});
+    backend.makeBoardMove(INIT_MOVE, {});
   };
 
   store.setState(() => ({ game: game_, resetMatch }));
 
   // Try to load the match from local storage, or create a new one.
   {
-    let match = loadMatchFromLocalStorage(game_, gameId);
-    if (!match) {
-      match = initMatch({
+    let backend = loadBackendFromLocalStorage(game_, gameId);
+    if (!backend) {
+      backend = initBackend({
         game: game_,
         gameId,
         matchData,
         gameData,
       });
     }
-    store.setState(() => ({ match }));
-    (window as any).lefun = { match };
+    store.setState(() => ({ match: backend }));
+    (window as any).lefun = { backend };
   }
 
   // We import the CSS using the package name because this is what will be needed by packages importing this.

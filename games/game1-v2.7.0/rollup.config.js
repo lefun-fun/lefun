@@ -1,12 +1,12 @@
 import { babel } from "@rollup/plugin-babel";
 import commonjs from "@rollup/plugin-commonjs";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
+import typescript from "@rollup/plugin-typescript";
 import copy from "rollup-plugin-copy";
 import postcss from "rollup-plugin-postcss";
-import typescript from "rollup-plugin-typescript2";
 
 export default {
-  input: "src/index.ts",
+  input: ["src/game.ts", "src/ui.tsx", "src/backend.ts"],
   output: {
     dir: "dist",
     format: "esm",

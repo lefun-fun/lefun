@@ -31,13 +31,14 @@
     "rollup-plugin-typescript2": "^0.31.2",
     "tslib": "^2.6.3",
     "typescript": "^5.5.4",
-    "vitest": "^2.0.5"
+    "vitest": "^2.0.5",
+    "immer": "^10.1.1"
   },
   "peerDependencies": {
-    "@lefun/core": "workspace:*"
+    "@lefun/core": "workspace:*",
+    "immer": "^10.1.1"
   },
   "dependencies": {
-    "immer": "^10.1.1",
     "lodash-es": "^4.17.21"
   }
 }

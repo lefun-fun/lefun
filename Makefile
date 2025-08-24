@@ -18,7 +18,7 @@ watch:
 check:
 	pnpm check
 
-.PHONY:fix 
+.PHONY: fix 
 fix:
 	pnpm fix
 

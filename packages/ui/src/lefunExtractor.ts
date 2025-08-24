@@ -33,7 +33,13 @@ export const lefunExtractor = <GS extends GameStateBase>(game: Game<GS>) => ({
       // };
 
       // The fields that don't need any arguments.
-      const fields = ["name", "tagline", "aka", "seoAka", "description"];
+      const fields = [
+        "name",
+        "tagline",
+        "aka",
+        "seoAka",
+        "description",
+      ] as const;
       for (const field of fields) {
         onMessageExtracted({
           id: gameMessageKeys[field](),
@@ -46,7 +52,7 @@ export const lefunExtractor = <GS extends GameStateBase>(game: Game<GS>) => ({
       // Game settings
       if (game.gameSettings) {
         for (const gameSetting of game.gameSettings) {
-          const fields = ["gameSettingLabel", "gameSettingHelp"];
+          const fields = ["gameSettingLabel", "gameSettingHelp"] as const;
           const { key } = gameSetting;
           for (const field of fields) {
             onMessageExtracted({
@@ -60,7 +66,7 @@ export const lefunExtractor = <GS extends GameStateBase>(game: Game<GS>) => ({
             const fields = [
               "gameSettingOptionLabel",
               "gameSettingOptionShortLabel",
-            ];
+            ] as const;
             for (const field of fields) {
               onMessageExtracted({
                 id: gameMessageKeys[field](key, value),
@@ -81,7 +87,7 @@ export const lefunExtractor = <GS extends GameStateBase>(game: Game<GS>) => ({
             continue;
           }
 
-          const fields = ["gamePlayerSettingLabel"];
+          const fields = ["gamePlayerSettingLabel"] as const;
           for (const field of fields) {
             onMessageExtracted({
               id: gameMessageKeys[field](key),
@@ -90,7 +96,7 @@ export const lefunExtractor = <GS extends GameStateBase>(game: Game<GS>) => ({
           }
 
           for (const { value } of options) {
-            const fields = ["gamePlayerSettingOptionLabel"];
+            const fields = ["gamePlayerSettingOptionLabel"] as const;
             for (const field of fields) {
               onMessageExtracted({
                 id: gameMessageKeys[field](key, value),

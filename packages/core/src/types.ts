@@ -27,6 +27,7 @@ export type GameSetting = {
   key: string;
   options: GameSettingOption[];
   // Don't hide the game setting even when the default value is selected.
+  // Defaults to `false`.
   alwaysShow?: boolean;
 
   // Keeping as optional for backward compatiblity
@@ -161,8 +162,22 @@ export type Credits = {
 // Some conditional type utilities.
 export type IfNull<T, Y, N> = [T] extends [null] ? Y : N;
 export type IfAny<T, Y, N> = 0 extends 1 & T ? Y : N;
+
 export type IfAnyNull<T, ANY, NULL, OTHER> = IfAny<
   T,
   ANY,
   IfNull<T, NULL, OTHER>
 >;
+
+export type IsExactly<T, U> = [T] extends [U]
+  ? [U] extends [T]
+    ? true
+    : false
+  : false;
+
+export type If_ObjectOrNull_Null<T, ObjOrNull, Null, ELSE> =
+  IsExactly<T, object | null> extends true
+    ? ObjOrNull
+    : IsExactly<T, null> extends true
+      ? Null
+      : ELSE;

@@ -38,7 +38,6 @@ test("meta initialize add remove", () => {
       poil: {
         ready: true,
         itsYourTurn: false,
-        joinedAt: now,
         isBot: false,
       },
     },
@@ -56,13 +55,11 @@ test("meta initialize add remove", () => {
       poil: {
         ready: true,
         itsYourTurn: false,
-        joinedAt: now,
         isBot: false,
       },
       patate: {
         ready: true,
         itsYourTurn: false,
-        joinedAt: now,
         isBot: true,
       },
     },
@@ -79,7 +76,6 @@ test("meta initialize add remove", () => {
       poil: {
         ready: true,
         itsYourTurn: false,
-        joinedAt: now,
         isBot: false,
       },
     },
@@ -96,13 +92,11 @@ test("meta initialize add remove", () => {
       poil: {
         ready: true,
         itsYourTurn: false,
-        joinedAt: now,
         isBot: false,
       },
       patate: {
         ready: true,
         itsYourTurn: false,
-        joinedAt: now,
         isBot: false,
       },
     },

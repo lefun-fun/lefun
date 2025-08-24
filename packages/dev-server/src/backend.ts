@@ -8,10 +8,7 @@ import {
   Meta,
   metaAddUserToMatch,
   metaInitialState,
-  metaSetTurns,
-  User,
   UserId,
-  UsersState,
 } from "@lefun/core";
 import {
   DelayedMove,
@@ -20,40 +17,61 @@ import {
   Game_,
   MoveExecutionOutput,
   Random,
+  updateMetaWithTurnInfo,
 } from "@lefun/game";
+import { User } from "@lefun/ui";
 
 import { generateId } from "./utils";
 
+type Player = {
+  userId: UserId;
+  isBot: boolean;
+  username: string;
+};
+
+type DelayedMoveId = string;
+
 // This is what would normally go in a database.
 type MatchStore = {
-  board: unknown;
-  playerboards: Record<UserId, unknown>;
-  secretboard: unknown;
-  //
+  board: object;
+  playerboards: Record<UserId, object | null>;
+  secretboard: object | null;
   meta: Meta;
   matchData: unknown;
   gameData: unknown;
   matchSettings: MatchSettings;
   matchPlayersSettings: MatchPlayersSettings;
-  //
-  users: UsersState;
-  //
+
+  // This represents the Users in the database.
+  users: Record<UserId, User>;
+
   // Simplified match statuses.
   matchStatus: "started" | "over";
+
   matchStats: { key: string; value: number }[];
   playerStats: Record<UserId, { key: string; value: number }[]>;
-  // <id> => delayedMove
+
   // We need an id to be able to remove them on execution.
-  delayedMoves: Record<string, DelayedMove>;
+  delayedMoves: Record<DelayedMoveId, DelayedMove>;
 };
 
 // We increment this every time we make backward incompatible changes in the match
 // saved to local storage. We save this version with the match to later detect that
 // a saved match is too old.
-const VERSION = 5;
+const VERSION = 6;
 
-/* This class replaces our backend */
-class Match extends EventTarget {
+// Events
+export const patchesForUserEvent = (userId: UserId) => `PATCHES/${userId}`;
+export const REVERT_MOVE_EVENT = "REVERT_MOVE";
+export const MOVE_EVENT = "MOVE";
+
+/*
+ * Simulates the backend.
+ *
+ * It holds the ground truth about the match state.
+ * Views can listen to events on it to update themselves.
+ * */
+class Backend extends EventTarget {
   random: Random;
   game: Game_;
   gameId: GameId;
@@ -78,7 +96,7 @@ class Match extends EventTarget {
   }: {
     game: Game_;
     gameId: GameId;
-    players: Record<UserId, User>;
+    players: Player[];
     matchSettings: MatchSettings;
     matchPlayersSettings: MatchPlayersSettings;
     matchData: unknown;
@@ -108,7 +126,7 @@ class Match extends EventTarget {
   }: {
     game: Game_;
     gameId: GameId;
-    players?: Record<UserId, User>;
+    players?: Player[];
     matchSettings?: MatchSettings;
     matchPlayersSettings?: MatchPlayersSettings;
     matchData?: unknown;
@@ -153,20 +171,16 @@ class Match extends EventTarget {
     }
 
     const areBots = Object.fromEntries(
-      Object.entries(players).map(([userId, { isBot }]) => [userId, !!isBot]),
+      players.map(({ userId, isBot }) => [userId, !!isBot]),
     );
 
-    const userIds = Object.keys(players);
+    const userIds = players.map(({ userId }) => userId);
 
     const meta = metaInitialState({ matchSettings, locale });
     const ts = new Date();
     for (const userId of userIds) {
       metaAddUserToMatch({ meta, userId, ts, isBot: false });
     }
-
-    const users: UsersState = {
-      byId: players,
-    };
 
     // We do this once to make sure we have the same data for everyplayer.
     // Then we'll deep copy the boards to make sure they are not linked.
@@ -183,17 +197,24 @@ class Match extends EventTarget {
     });
 
     const { board, secretboard = {} } = initialBoards;
-    const playerboards =
+    const playerboards: Record<UserId, object | null> =
       initialBoards.playerboards ||
-      Object.fromEntries(userIds.map((userId) => [userId, {}]));
+      Object.fromEntries(userIds.map((userId) => [userId, null]));
+
+    const users = Object.fromEntries(
+      players.map(({ userId, username, isBot }) => [
+        userId,
+        { username, isBot },
+      ]),
+    );
 
     this.store = {
-      meta,
       users,
       //
       matchSettings,
       matchPlayersSettings,
       //
+      meta,
       board,
       playerboards,
       secretboard,
@@ -217,7 +238,7 @@ class Match extends EventTarget {
       );
       this._removeDelayedMove(delayedMoveId);
       // Force refresh of the list of delayed moves.
-      this.dispatchEvent(new CustomEvent("move"));
+      this.dispatchEvent(new CustomEvent(MOVE_EVENT));
       return;
     }
 
@@ -308,6 +329,17 @@ class Match extends EventTarget {
       store.secretboard = secretboard;
     }
 
+    // Update meta
+    const { beginTurn, endTurn } = result;
+    const { meta: newMeta, patches: metaPatches } = updateMetaWithTurnInfo({
+      meta,
+      beginTurn,
+      endTurn,
+      now,
+    });
+
+    store.meta = newMeta;
+
     // Send out patches to users.
     {
       const userIds = store.meta.players.allIds;
@@ -319,21 +351,25 @@ class Match extends EventTarget {
       const { patches } = result;
 
       separatePatchesByUser({
-        patches,
+        patches: [...patches, ...metaPatches],
         userIds,
         patchesOut: patchesByUserId,
       });
+
+      // Add the `meta` patches to everyone.
 
       for (const [userId, patches] of Object.entries(patchesByUserId)) {
         if (patches.length === 0) {
           continue;
         }
         this.dispatchEvent(
-          new CustomEvent(`patches:${userId}`, { detail: { moveId, patches } }),
+          new CustomEvent(patchesForUserEvent(userId), {
+            detail: { moveId, patches },
+          }),
         );
       }
       // This is for the dev server state view so that it knows it needs to update.
-      this.dispatchEvent(new CustomEvent("move"));
+      this.dispatchEvent(new CustomEvent(MOVE_EVENT));
     }
 
     // Has the match ended?
@@ -345,35 +381,18 @@ class Match extends EventTarget {
     for (const stat of result.stats) {
       const { key, value, userId } = stat;
       if (userId) {
-        this.store.playerStats[userId].push({ key, value });
+        this.store.playerStats[userId]!.push({ key, value });
       } else {
         this.store.matchStats.push({ key, value });
       }
     }
 
-    // Turns
-    metaSetTurns({
-      meta,
-      userIds: Array.from(result.beginTurnUsers),
-      value: true,
-    });
-
-    metaSetTurns({
-      meta,
-      userIds: Array.from(result.endTurnUsers),
-      value: false,
-    });
-
-    if (result.beginTurnUsers.size > 0 || result.endTurnUsers.size > 0) {
-      this.dispatchEvent(new CustomEvent("metaChanged"));
-    }
-
     // Also cancel move expiry timeouts for users whose turn has ended.
-    for (const userId of result.endTurnUsers) {
+    for (const userId of Object.keys(result.endTurn)) {
       this._removeDelayedMoveForUser(userId);
     }
 
-    for (const userId of result.beginTurnUsers) {
+    for (const userId of Object.keys(result.beginTurn)) {
       this._removeDelayedMoveForUser(userId);
     }
 
@@ -382,7 +401,7 @@ class Match extends EventTarget {
       this._addDelayedMove(delayedMove);
     }
 
-    saveMatchToLocalStorage(this, this.gameId);
+    saveBackendToLocalStorage(this, this.gameId);
   }
 
   makeBoardMove(name: string, payload: any) {
@@ -406,7 +425,9 @@ class Match extends EventTarget {
       this._makeMove(name, payload, userId, moveId);
     } catch (e) {
       console.error("There was an error executing move", name, e);
-      this.dispatchEvent(new CustomEvent("revertMove", { detail: { moveId } }));
+      this.dispatchEvent(
+        new CustomEvent(REVERT_MOVE_EVENT, { detail: { moveId } }),
+      );
     }
   }
 
@@ -455,7 +476,7 @@ class Match extends EventTarget {
     return JSON.stringify({ store, version: VERSION });
   }
 
-  static _deserialize(str: string, game: Game_, gameId: GameId): Match {
+  static _deserialize(str: string, game: Game_, gameId: GameId): Backend {
     const obj = JSON.parse(str);
     const { store, version } = obj;
 
@@ -464,7 +485,7 @@ class Match extends EventTarget {
       throw new Error(`unsupported version ${version}`);
     }
 
-    return new Match({
+    return new Backend({
       game,
       gameId,
       store,
@@ -475,30 +496,26 @@ class Match extends EventTarget {
 export function separatePatchesByUser({
   patches,
   userIds,
-  ignoreUserId = null,
   patchesOut,
 }: {
   patches: Patch[];
   userIds: UserId[];
-  ignoreUserId?: UserId | null;
   patchesOut: Record<UserId, Patch[]>;
 }) {
   for (const patch of patches) {
     const { path } = patch;
     const [p0, p1, ...rest] = path;
-    // "board" patches, we send those to everyone but the user making the move.
-    if (p0 === "board") {
+    // "board" and "meta" patches are sent to everyone.
+    if (p0 === "board" || p0 === "meta") {
       for (const userId of userIds) {
-        if (userId !== ignoreUserId) {
-          patchesOut[userId].push(patch);
-        }
+        patchesOut[userId]!.push(patch);
       }
-      patchesOut["spectator"].push(patch);
+      patchesOut["spectator"]!.push(patch);
     }
     // Send 'playerboards' patches to concerned players.
     else if (p0 === "playerboards") {
-      if (p1 !== ignoreUserId) {
-        patchesOut[p1].push({ ...patch, path: ["playerboard", ...rest] });
+      if (p1) {
+        patchesOut[p1]!.push({ ...patch, path: ["playerboard", ...rest] });
       }
     } else if (p0 === "secretboard") {
       //
@@ -512,11 +529,14 @@ function _matchKey(gameId?: string) {
   return `match${gameId ? `.${gameId}` : ""}`;
 }
 
-function saveMatchToLocalStorage(match: Match, gameId?: string) {
+function saveBackendToLocalStorage(match: Backend, gameId?: string) {
   localStorage.setItem(_matchKey(gameId), match._serialize());
 }
 
-function loadMatchFromLocalStorage(game: Game_, gameId: GameId): Match | null {
+function loadBackendFromLocalStorage(
+  game: Game_,
+  gameId: GameId,
+): Backend | null {
   const str = localStorage.getItem(_matchKey(gameId));
 
   if (!str) {
@@ -524,11 +544,11 @@ function loadMatchFromLocalStorage(game: Game_, gameId: GameId): Match | null {
   }
 
   try {
-    return Match._deserialize(str, game, gameId);
+    return Backend._deserialize(str, game, gameId);
   } catch (e) {
     console.warn("Failed to deserialize match", e);
     return null;
   }
 }
 
-export { loadMatchFromLocalStorage, Match, saveMatchToLocalStorage };
+export { Backend, loadBackendFromLocalStorage, saveBackendToLocalStorage };

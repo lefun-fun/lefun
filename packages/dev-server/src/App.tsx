@@ -15,6 +15,7 @@ import {
   GameSetting,
   GameSettings_,
   Locale,
+  Meta,
   UserId,
 } from "@lefun/core";
 import {
@@ -31,7 +32,12 @@ import {
   UseSelector,
 } from "@lefun/ui";
 
-import { Match } from "./match";
+import {
+  Backend,
+  MOVE_EVENT,
+  patchesForUserEvent,
+  REVERT_MOVE_EVENT,
+} from "./backend";
 import { OptimisticBoards } from "./moves";
 import { useStore } from "./store";
 import { generateId } from "./utils";
@@ -56,14 +62,14 @@ const reformatPlayerboardPatch = (patch: Patch) => {
 
 const BoardForPlayer = ({
   BoardComponent,
-  match,
+  backend,
   userId,
   messages,
   locale,
   gameId,
 }: {
   BoardComponent: () => ReactNode;
-  match: Match;
+  backend: Backend;
   userId: UserId | "spectator";
   messages: Record<string, string>;
   locale: Locale;
@@ -80,17 +86,17 @@ const BoardForPlayer = ({
   const optimisticBoards = useRef(
     proxy(
       new OptimisticBoards({
-        board: match.store.board,
-        playerboard: match.store.playerboards[userId],
+        board: backend.store.board,
+        playerboard: backend.store.playerboards[userId] || null,
+        meta: backend.store.meta,
       }),
     ),
   );
 
   useEffect(() => {
-    const { store: mainStore } = match;
-    const { users } = mainStore;
+    const { store: mainStore } = backend;
 
-    match.addEventListener(`patches:${userId}`, (event: any) => {
+    backend.addEventListener(patchesForUserEvent(userId), (event: any) => {
       if (!event) {
         return;
       }
@@ -103,17 +109,18 @@ const BoardForPlayer = ({
       }, LATENCY);
     });
 
-    match.addEventListener("revertMove", (event: any) => {
+    backend.addEventListener(REVERT_MOVE_EVENT, (event: any) => {
       const { moveId } = event.detail;
       optimisticBoards.current.revertMove(moveId);
     });
 
     setMakeMove((name, payload) => {
       if (userId === "spectator") {
-        throw new Error("spectator cannot make moves");
+        console.warn("spectator cannot make moves");
+        return;
       }
 
-      if (match.store.matchStatus === "over") {
+      if (backend.store.matchStatus === "over") {
         console.warn("match is over");
         return;
       }
@@ -124,20 +131,20 @@ const BoardForPlayer = ({
         result = executePlayerMove({
           name,
           payload,
-          game: match.game,
+          game: backend.game,
           userId,
           board: optimisticBoards.current.board,
           playerboards: { [userId]: optimisticBoards.current.playerboard },
           secretboard: null,
           now: new Date().getTime(),
-          random: match.random,
+          random: backend.random,
           skipCanDo: false,
           onlyExecuteNow: true,
           // Note that technically we should not use anything from
           // `match.store` as this represents the DB.
-          matchData: match.store.matchData,
-          gameData: match.store.gameData,
-          meta: match.store.meta,
+          matchData: backend.store.matchData,
+          gameData: backend.store.gameData,
+          meta: backend.store.meta,
         });
       } catch {
         console.warn(
@@ -153,10 +160,12 @@ const BoardForPlayer = ({
       optimisticBoards.current.makeMove(moveId, patches);
 
       // Run the move in the backend also.
-      match.makeMove({ userId, name, payload, moveId });
+      backend.makeMove({ userId, name, payload, moveId });
     });
 
-    const _useSelector = (): UseSelector => {
+    const { users } = mainStore;
+
+    const _useSelector = (): UseSelector<GameStateBase> => {
       // We wrap it to respect the rules of hooks.
       const useSelector = <GS extends GameStateBase, T>(
         selector: Selector<GS, T>,
@@ -164,7 +173,16 @@ const BoardForPlayer = ({
         const snapshot = useSnapshot(optimisticBoards.current);
         const board = snapshot.board;
         const playerboard = snapshot.playerboard;
-        return selector({ board, playerboard, users, userId });
+        const meta = snapshot.meta as Meta;
+        return selector({
+          board,
+          playerboard,
+          meta,
+          userId,
+          users,
+          timeDelta: 0,
+          timeLatency: 0,
+        });
       };
       return useSelector;
     };
@@ -172,11 +190,15 @@ const BoardForPlayer = ({
     setUseSelector(_useSelector);
 
     setUseStore(() => {
+      const playerboard = optimisticBoards.current.playerboard;
       return {
         board: snapshot(optimisticBoards.current.board),
-        playerboard: snapshot(optimisticBoards.current.playerboard),
+        playerboard: playerboard === null ? null : snapshot(playerboard),
+        meta: snapshot(optimisticBoards.current.meta) as Meta,
         userId,
-        users: mainStore.users,
+        users,
+        timeDelta: 0,
+        timeLatency: 0,
       };
     });
 
@@ -184,7 +206,7 @@ const BoardForPlayer = ({
     setUseSelectorShallow(_useSelector);
 
     setLoading(false);
-  }, [userId, match, gameId]);
+  }, [userId, backend, gameId]);
 
   if (loading) {
     return <div>Loading player...</div>;
@@ -224,7 +246,7 @@ const PlayerStats = ({ userId }: { userId: UserId }) => {
     (state) => state.match?.store.playerStats[userId] || [],
   );
   const username = useStore(
-    (state) => state.match?.store.users.byId[userId]?.username,
+    (state) => state.match?.store.users[userId]?.username,
   );
 
   return (
@@ -283,10 +305,10 @@ function MatchStateView() {
         setRefreshCounter((prev) => prev + 1);
       };
 
-      match.addEventListener("move", handler);
+      match.addEventListener(MOVE_EVENT, handler);
 
       return () => {
-        match.removeEventListener("move", handler);
+        match.removeEventListener(MOVE_EVENT, handler);
       };
     }, [match]);
   }
@@ -300,17 +322,19 @@ function MatchStateView() {
   return (
     <div className="">
       {store.matchStatus || "no status"}
-      {(["board", "playerboards", "secretboard"] as const).map((key) => (
-        <JsonEditor
-          key={key}
-          data={store[key] as any}
-          collapse={2}
-          rootName={key}
-          restrictEdit={true}
-          restrictDelete={true}
-          restrictAdd={true}
-        />
-      ))}
+      {(["board", "playerboards", "secretboard", "meta"] as const).map(
+        (key) => (
+          <JsonEditor
+            key={key}
+            data={store[key] as any}
+            collapse={2}
+            rootName={key}
+            restrictEdit={true}
+            restrictDelete={true}
+            restrictAdd={true}
+          />
+        ),
+      )}
       {store.meta.players.allIds.map((userId) => (
         <PlayerStats userId={userId} key={userId} />
       ))}
@@ -404,8 +428,8 @@ function MatchSettingsView({ gameSettings }: { gameSettings: GameSettings_ }) {
       {gameSettings.allIds.map((key) => (
         <MatchSetting
           key={key}
-          gameSetting={gameSettings.byId[key]}
-          matchValue={matchSettings[key]}
+          gameSetting={gameSettings.byId[key]!}
+          matchValue={matchSettings[key]!}
         />
       ))}
     </SettingsSection>
@@ -470,7 +494,7 @@ function MatchPlayerSettings({
   );
 
   const username = useStore(
-    (state) => state.match?.store.users.byId[userId]?.username,
+    (state) => state.match?.store.users[userId]?.username,
   );
 
   if (!gamePlayerSettings || !matchPlayersSettings) {
@@ -479,15 +503,20 @@ function MatchPlayerSettings({
 
   return (
     <div className="w-full">
-      <label className="text-black font-semibold text-center w-full">
-        {username}
-      </label>
+      <input
+        type="text"
+        className="text-black font-semibold w-full"
+        value={username}
+        onChange={() => {
+          console.warn("NOT IMPLEMENTED YET change username");
+        }}
+      />
       {gamePlayerSettings.allIds.map((key) => (
         <MatchPlayerSetting
           key={key}
           userId={userId}
-          gameSetting={gamePlayerSettings.byId[key]}
-          matchValue={matchPlayersSettings[userId][key]}
+          gameSetting={gamePlayerSettings.byId[key]!}
+          matchValue={matchPlayersSettings[userId]![key]!}
         />
       ))}
     </div>
@@ -505,7 +534,7 @@ function PlayerSettingsView({
   }
   const { users } = match.store;
 
-  const userIds = Object.keys(users.byId);
+  const userIds = Object.keys(users);
 
   return (
     <SettingsSection>
@@ -558,7 +587,10 @@ function ButtonRow({ children }: { children: ReactNode }) {
 }
 
 function capitalize(s: string): string {
-  return s && s[0].toUpperCase() + s.slice(1);
+  if (s === "") {
+    return "";
+  }
+  return s && s[0]!.toUpperCase() + s.slice(1);
 }
 
 function SettingsButtons() {
@@ -724,31 +756,74 @@ function Settings() {
 const ItsMyTurn = ({ userId }: { userId: UserId }) => {
   const match = useStore((state) => state.match);
 
+  const ref = useRef<HTMLDivElement>(null);
+
   const [itsMyTurn, setItsMyTurn] = useState(
     () => match?.store.meta.players.byId[userId]?.itsYourTurn || false,
   );
+
+  const [width, setWidth] = useState(0);
 
   useEffect(() => {
     if (!match || userId === "spectator") {
       return;
     }
 
-    const handler = () => {
-      setItsMyTurn(match?.store.meta.players.byId[userId].itsYourTurn || false);
-    };
-    match.addEventListener("metaChanged", handler);
+    let interval: NodeJS.Timeout;
 
-    return () => match.removeEventListener("metaChanged", handler);
+    const handler = () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+      const myTurn = match.store.meta.players.byId[userId]!.itsYourTurn;
+      setItsMyTurn(myTurn);
+
+      if (!myTurn) {
+        setWidth(0);
+        return;
+      }
+
+      const beganAt = match?.store.meta.players.byId[userId]!.turnBeganAt;
+      const expiresAt = match?.store.meta.players.byId[userId]!.turnExpiresAt;
+
+      if (expiresAt) {
+        interval = setInterval(() => {
+          const totalWidth = ref.current?.clientWidth || 0;
+          const now = new Date().getTime();
+          if (!beganAt) {
+            console.warn("beganAt is undefined");
+            return;
+          }
+          const width = ((now - beganAt) / (expiresAt - beganAt)) * totalWidth;
+          setWidth(Math.min(width, totalWidth));
+        }, 50);
+      }
+    };
+    match.addEventListener(patchesForUserEvent(userId), handler);
+
+    return () => {
+      match.removeEventListener(patchesForUserEvent(userId), handler);
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [match, userId]);
 
   return (
     <div
       className={classNames(
         "text-xs text-center",
-        "relative w-full h-4",
+        "relative w-full h-4 z-0",
         itsMyTurn ? "font-semibold bg-red-200" : "bg-gray-100",
       )}
+      ref={ref}
     >
+      {itsMyTurn && (
+        <div
+          className="absolute left-0 top-0 h-full bg-black opacity-10 z-10"
+          style={{ width }}
+        ></div>
+      )}
       {userId}
     </div>
   );
@@ -854,7 +929,7 @@ function Dimensions({
 }
 
 type Lefun = {
-  match: Match;
+  backend: Backend;
 };
 
 function Main() {
@@ -886,6 +961,6 @@ function Main() {
   );
 }
 
-type AllMessages = Record<string, Record<string, string>>;
+type AllMessages = Record<Locale, Record<string, string>>;
 
 export { AllMessages, BoardForPlayer, Lefun, Main, RulesWrapper };

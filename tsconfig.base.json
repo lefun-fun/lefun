@@ -7,9 +7,11 @@
     "sourceMap": true,
     "moduleResolution": "node",
     "declaration": true,
+    "declarationMap": true,
     "allowSyntheticDefaultImports": true,
     "allowJs": true,
     "esModuleInterop": true,
-    "noEmitOnError": true
+    "noEmitOnError": true,
+    "noUncheckedIndexedAccess": true
   }
 }

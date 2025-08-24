@@ -1,7 +1,7 @@
 import { enablePatches, produceWithPatches } from "immer";
 import { expect, test } from "vitest";
 
-import { separatePatchesByUser } from "./match";
+import { separatePatchesByUser } from "./backend";
 
 enablePatches();
 
@@ -46,7 +46,6 @@ test("separatePatchesByUser", () => {
     },
   ]);
 
-  // Without ignoreUserId
   {
     const patchesByUser = {
       user1: [],
@@ -57,7 +56,6 @@ test("separatePatchesByUser", () => {
     separatePatchesByUser({
       patches,
       userIds: ["user1", "user2"],
-      ignoreUserId: null,
       patchesOut: patchesByUser,
     });
 
@@ -73,45 +71,6 @@ test("separatePatchesByUser", () => {
         value: { x: 456 },
       },
     ]);
-
-    expectArraysEqual(patchesByUser["user2"], [
-      {
-        op: "replace",
-        path: ["board"],
-        value: { x: 456 },
-      },
-      {
-        op: "replace",
-        path: ["playerboard"],
-        value: { x: 456 },
-      },
-    ]);
-
-    expectArraysEqual(patchesByUser["spectator"], [
-      {
-        op: "replace",
-        path: ["board"],
-        value: { x: 456 },
-      },
-    ]);
-  }
-
-  // With ignoreUserId
-  {
-    const patchesByUser = {
-      user1: [],
-      user2: [],
-      spectator: [],
-    };
-
-    separatePatchesByUser({
-      patches,
-      userIds: ["user1", "user2"],
-      ignoreUserId: "user1",
-      patchesOut: patchesByUser,
-    });
-
-    expectArraysEqual(patchesByUser["user1"], []);
 
     expectArraysEqual(patchesByUser["user2"], [
       {

@@ -3,17 +3,45 @@ import { I18nProvider } from "@lingui/react";
 import { render as rtlRender, RenderResult } from "@testing-library/react";
 import { ElementType, ReactNode } from "react";
 
+import { UserId } from "@lefun/core";
+import { GameStateBase, MatchTester } from "@lefun/game";
 import {
-  MatchState,
   setMakeMove,
   setUseSelector,
   setUseSelectorShallow,
   setUseStore,
+  UIState,
+  Users,
 } from "@lefun/ui";
+
+export function getUIStateFromMatchTester({
+  matchTester,
+  userId,
+}: {
+  matchTester: MatchTester<any, any>;
+  userId: UserId;
+}): UIState {
+  const { board, playerboards, meta } = matchTester;
+  const users: Users = {};
+
+  for (const userId of meta.players.allIds) {
+    users[userId] = { username: `User ${userId}` };
+  }
+
+  return {
+    userId,
+    board,
+    playerboard: playerboards[userId],
+    meta,
+    users,
+    timeLatency: 0,
+    timeDelta: 0,
+  };
+}
 
 export function render(
   Board: ElementType,
-  state: MatchState,
+  state: UIState<GameStateBase>,
   locale: string = "en",
 ): RenderResult {
   const userId = state.userId;

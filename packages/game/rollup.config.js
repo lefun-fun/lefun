@@ -17,5 +17,5 @@ export default {
     typescript({ useTsconfigDeclarationDir: true }),
   ],
 
-  external: ["@lefun/core"],
+  external: ["@lefun/core", "immer"],
 };

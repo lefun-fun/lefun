@@ -2,7 +2,7 @@
 
 import { enablePatches, Patch, produceWithPatches, setAutoFreeze } from "immer";
 
-import type { Meta, UserId } from "@lefun/core";
+import { Meta, metaBeginTurn, metaEndTurn, UserId } from "@lefun/core";
 
 import {
   BoardExecute,
@@ -14,7 +14,7 @@ import {
   Turns,
 } from "./gameDef";
 import { Random } from "./random";
-import { parseMove, parseTurnUserIds } from "./utils";
+import { parseMove } from "./utils";
 
 enablePatches();
 setAutoFreeze(false);
@@ -82,9 +82,9 @@ function tryProduceWithPatches<T>(
 }
 
 export type MoveExecutionOutput = {
-  board: unknown;
-  playerboards: Record<UserId, unknown>;
-  secretboard: unknown;
+  board: object;
+  playerboards: Record<UserId, object | null>;
+  secretboard: object | null;
   patches: Patch[];
 } & SideEffectResults;
 
@@ -144,7 +144,7 @@ export function executePlayerMove<GS extends GameStateBase>({
     !canDo({
       userId,
       board,
-      playerboard: userId ? playerboards[userId] : undefined!,
+      playerboard: playerboards[userId]!,
       payload,
       ts: now,
     })
@@ -172,7 +172,7 @@ export function executePlayerMove<GS extends GameStateBase>({
       ({ board, playerboards }) => {
         executeNow({
           board,
-          playerboard: playerboards[userId],
+          playerboard: playerboards[userId]!,
           userId,
           payload,
           _: moveSideEffects,
@@ -226,12 +226,22 @@ export function executePlayerMove<GS extends GameStateBase>({
   };
 }
 
+type BeginTurn = Record<UserId, { expiresAt?: number }>;
+type EndTurn = Record<UserId, null>;
+
 type SideEffectResults = {
   matchHasEnded: boolean;
-  beginTurnUsers: Set<UserId>;
-  endTurnUsers: Set<UserId>;
+  beginTurn: BeginTurn;
+  endTurn: EndTurn;
   delayedMoves: DelayedMove[];
   stats: Stat[];
+};
+
+const ensureArray = <T>(x: T | T[]): T[] => {
+  if (!Array.isArray(x)) {
+    x = [x];
+  }
+  return x;
 };
 
 function defineMoveSideEffects<GS extends GameStateBase>({
@@ -245,8 +255,8 @@ function defineMoveSideEffects<GS extends GameStateBase>({
 }): { sideEffectResults: SideEffectResults; moveSideEffects: MoveSideEffects } {
   const sideEffectResults: SideEffectResults = {
     matchHasEnded: false,
-    beginTurnUsers: new Set(),
-    endTurnUsers: new Set(),
+    beginTurn: {},
+    endTurn: {},
     delayedMoves: [],
     stats: [],
   };
@@ -260,13 +270,8 @@ function defineMoveSideEffects<GS extends GameStateBase>({
     { expiresIn, playerMoveOnExpire, boardMoveOnExpire } = {},
   ) => {
     let expiresAt: number | undefined = undefined;
-    userIds = parseTurnUserIds(userIds, {
-      allUserIds: meta.players.allIds,
-    });
-    for (const userId of userIds) {
-      sideEffectResults.beginTurnUsers.add(userId);
-      sideEffectResults.endTurnUsers.delete(userId);
-    }
+
+    userIds = ensureArray(userIds);
 
     if (expiresIn !== undefined) {
       const ts = now + expiresIn;
@@ -305,16 +310,20 @@ function defineMoveSideEffects<GS extends GameStateBase>({
       }
       expiresAt = ts;
     }
+
+    for (const userId of userIds) {
+      sideEffectResults.beginTurn[userId] = { expiresAt };
+      delete sideEffectResults.endTurn[userId];
+    }
+
     return { expiresAt };
   };
 
   const turnsEnd: Turns["end"] = (userIds) => {
-    userIds = parseTurnUserIds(userIds, {
-      allUserIds: meta.players.allIds,
-    });
+    userIds = ensureArray(userIds);
     for (const userId of userIds) {
-      sideEffectResults.endTurnUsers.add(userId);
-      sideEffectResults.beginTurnUsers.delete(userId);
+      sideEffectResults.endTurn[userId] = null;
+      delete sideEffectResults.beginTurn[userId];
     }
   };
 
@@ -354,7 +363,9 @@ function defineMoveSideEffects<GS extends GameStateBase>({
     delayMove,
     turns: {
       begin: turnsBegin,
+      beginAll: (options) => turnsBegin(meta.players.allIds, options),
       end: turnsEnd,
+      endAll: () => turnsEnd(meta.players.allIds),
     },
     endMatch,
     logPlayerStat,
@@ -444,4 +455,42 @@ export function executeBoardMove<GS extends GameStateBase>({
     patches,
     ...sideEffectResults,
   };
+}
+
+export function updateMetaWithTurnInfo({
+  meta,
+  beginTurn,
+  endTurn,
+  now,
+}: {
+  meta: Meta;
+  beginTurn: BeginTurn;
+  endTurn: EndTurn;
+  now: number;
+}): { meta: Meta; patches: Patch[] } {
+  const [newMeta, metaPatches] = produceWithPatches<{ meta: Meta }>(
+    // Wrap `meta` in an object to to be able to merge with the board patches.
+    { meta },
+    (draft: { meta: Meta }) => {
+      const { meta } = draft;
+
+      for (const [userId, { expiresAt }] of Object.entries(beginTurn)) {
+        metaBeginTurn({
+          meta,
+          beginsAt: now,
+          userId,
+          expiresAt,
+        });
+      }
+
+      for (const userId of Object.keys(endTurn)) {
+        metaEndTurn({
+          meta,
+          userId,
+        });
+      }
+    },
+  );
+
+  return { meta: newMeta.meta, patches: metaPatches };
 }

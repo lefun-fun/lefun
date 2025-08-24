@@ -1,38 +1,48 @@
 import { applyPatches, Patch } from "immer";
 
+import { Meta } from "@lefun/core";
 import { GameStateBase } from "@lefun/game";
 
 import { deepCopy } from "./utils";
 
-export class OptimisticBoards<GS extends GameStateBase> {
+export class OptimisticBoards<GS extends GameStateBase = GameStateBase> {
   _confirmedBoard: GS["B"];
-  _confirmedPlayerboard: GS["PB"];
+  _confirmedPlayerboard: GS["PB"] | null;
+  _confirmedMeta: Meta;
   // The player's moves that have not been confirmed yet
   _pendingMoves: { moveId: string; patches: Patch[] }[];
   // ConfirmedBoard + pending moves updates: this is what we will display.
   board: GS["B"];
-  playerboard: GS["PB"];
+  // `null` for spectators. Note that GS["PB"] can itself be `null` for games without playerboards.
+  playerboard: GS["PB"] | null;
+
+  meta: Meta;
 
   constructor({
     board,
     playerboard,
+    meta,
   }: {
     board: GS["B"];
-    playerboard: GS["PB"];
+    playerboard: GS["PB"] | null;
+    meta: Meta;
   }) {
     board = deepCopy(board);
     playerboard = deepCopy(playerboard);
+    meta = deepCopy(meta);
 
     this._confirmedBoard = board;
     this._confirmedPlayerboard = playerboard;
+    this._confirmedMeta = meta;
     this._pendingMoves = [];
     this.board = board;
     this.playerboard = playerboard;
+    this.meta = meta;
   }
 
   _getMoveIndex(moveId: string): number {
     for (let i = 0; i < this._pendingMoves.length; i++) {
-      if (this._pendingMoves[i].moveId === moveId) {
+      if (this._pendingMoves[i]!.moveId === moveId) {
         return i;
       }
     }
@@ -43,11 +53,16 @@ export class OptimisticBoards<GS extends GameStateBase> {
   _replay() {
     let board = this._confirmedBoard;
     let playerboard = this._confirmedPlayerboard;
+    let meta = this._confirmedMeta;
     for (const { patches } of this._pendingMoves) {
-      ({ board, playerboard } = applyPatches({ board, playerboard }, patches));
+      ({ board, playerboard, meta } = applyPatches(
+        { board, playerboard, meta },
+        patches,
+      ));
     }
     this.board = board;
     this.playerboard = playerboard;
+    this.meta = meta;
   }
 
   makeMove(moveId: string, patches: Patch[]) {
@@ -72,11 +87,16 @@ export class OptimisticBoards<GS extends GameStateBase> {
    */
   confirmMove({ moveId, patches }: { moveId?: string; patches: Patch[] }) {
     // Start from the confirmed boards
-    const { _confirmedBoard: board, _confirmedPlayerboard: playerboard } = this;
+    const {
+      _confirmedBoard: board,
+      _confirmedPlayerboard: playerboard,
+      _confirmedMeta: meta,
+    } = this;
     {
-      const state = applyPatches({ board, playerboard }, patches);
+      const state = applyPatches({ board, playerboard, meta }, patches);
       this._confirmedBoard = state.board;
       this._confirmedPlayerboard = state.playerboard;
+      this._confirmedMeta = state.meta;
     }
 
     // Remove the `moveId` if it's one of our moves.
