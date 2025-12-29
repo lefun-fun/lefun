@@ -759,6 +759,27 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
   get botTrainingLog() {
     return this._botTrainingLog;
   }
+
+  /* Get the list of players in the match. */
+  players(): UserId[] {
+    return this.meta.players.allIds.slice();
+  }
+
+  /* Get the set of players whose turn it is. */
+  playersInTurn(): Set<UserId> {
+    const result = new Set<UserId>();
+    for (const userId of this.meta.players.allIds) {
+      if (this.meta.players.byId[userId]?.itsYourTurn) {
+        result.add(userId);
+      }
+    }
+    return result;
+  }
+
+  /* Is it the given user's turn? */
+  hasTurn(userId: UserId): boolean {
+    return !!this.meta.players.byId[userId]?.itsYourTurn;
+  }
 }
 
 function sortDelayedMoves(delayedMoves: DelayedMove[]): void {
