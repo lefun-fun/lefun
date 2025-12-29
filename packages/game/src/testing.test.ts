@@ -397,3 +397,51 @@ test("end match ends turns", () => {
   expect(match.matchHasEnded).toBe(true);
   expect(match.meta.players.byId[userId]?.itsYourTurn).toBe(false);
 });
+
+test("match with timeouts for all moves ends at some point", () => {
+  type B = {
+    firstPlayer: string;
+    n: number;
+  };
+
+  type GS = GameState<B>;
+
+  const game = {
+    ...gameBase,
+    initialBoards: ({ players }) => ({
+      board: { n: 0, firstPlayer: players[0]! },
+    }),
+    playerMoves: {
+      inc: {
+        execute({ board, userId, _ }) {
+          _.turns.begin(userId, { expiresIn: 1, playerMoveOnExpire: "inc" });
+          if (board.n >= 100) {
+            _.endMatch();
+          }
+          board.n += 1;
+        },
+      },
+    },
+    boardMoves: {
+      [INIT_MOVE]: {
+        execute({ board, turns }) {
+          turns.begin(board.firstPlayer, {
+            expiresIn: 1,
+            playerMoveOnExpire: "inc",
+          });
+        },
+      },
+    },
+  } satisfies Game<GS>;
+
+  type G = typeof game;
+
+  const match = new MatchTester<GS, G>({
+    game,
+    numPlayers: 1,
+  });
+
+  expect(match.matchHasEnded).toBe(false);
+  match.fastForward(9999999999);
+  expect(match.matchHasEnded).toBe(true);
+});

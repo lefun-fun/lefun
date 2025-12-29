@@ -707,6 +707,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
 
     if (delayedMoves.length === 0) {
       this.time += delta;
+      this.logger?.debug?.({ time: this.time }, "fastForward done");
       return;
     }
 
@@ -740,9 +741,9 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
         }
       }
 
-      // Keep fast-forwarding
+      // Keep fast-forwarding, unless the match has ended.
       const newDelta = delta - timeToNextDelayedMove;
-      if (newDelta > 0) {
+      if (newDelta > 0 && !this.matchHasEnded) {
         this.fastForward(delta - timeToNextDelayedMove);
       }
     } else {
