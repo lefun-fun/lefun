@@ -51,10 +51,10 @@ export type MatchTesterOptions<GS extends GameStateBase, G extends Game<GS>> = {
   matchSettings?: MatchSettings;
   matchPlayersSettingsArr?: MatchPlayerSettings[];
   random?: Random;
-  verbose?: boolean;
   training?: boolean;
   logBoardToTrainingLog?: boolean;
   locale?: Locale;
+  logger?: Logger;
 };
 
 export type BotTrainingLogItem =
@@ -82,6 +82,13 @@ type MakeMoveRest<
   // other
   [GetPayload<G, K>] | [GetPayload<G, K>, MakeMoveOptions]
 >;
+
+export interface Logger {
+  debug?(obj: unknown, msg?: string, ...args: unknown[]): void;
+  info?(obj: unknown, msg?: string, ...args: unknown[]): void;
+  warn?(obj: unknown, msg?: string, ...args: unknown[]): void;
+  error?(obj: unknown, msg?: string, ...args: unknown[]): void;
+}
 
 /*
  * Use this to test your game rules.
@@ -112,7 +119,6 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
   _sameBotCount: number;
   _lastBotUserId?: UserId;
   _botTrainingLog: BotTrainingLogItem[];
-  _verbose: boolean;
   _logBoardToTrainingLog: boolean;
   // Are we using the MatchTester for training.
   // TODO We should probably use different classes for training and for testing.
@@ -122,6 +128,8 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
 
   playerStats: Record<UserId, { key: string; value: number }[]>;
   matchStats: { key: string; value: number }[];
+
+  logger?: Logger;
 
   constructor({
     game,
@@ -134,10 +142,10 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     matchSettings = {},
     matchPlayersSettingsArr,
     random,
-    verbose = false,
     training = false,
     logBoardToTrainingLog = false,
     locale = "en",
+    logger = undefined,
   }: MatchTesterOptions<GS, G>) {
     if (random == null) {
       random = new Random();
@@ -267,7 +275,6 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     this._sameBotCount = 0;
 
     this._botTrainingLog = [];
-    this._verbose = verbose;
     this._training = training;
     this._logBoardToTrainingLog = logBoardToTrainingLog;
     this._agents = {};
@@ -276,6 +283,8 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
 
     this.playerStats = {};
     this.matchStats = [];
+
+    this.logger = logger;
 
     // Make the special initial move.
     if (game.boardMoves?.[INIT_MOVE]) {
@@ -491,6 +500,8 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
           ? [rest[0], {}]
           : rest;
 
+    this.logger?.info?.({ userId, moveName, payload }, "makeMove");
+
     const {
       board,
       playerboards,
@@ -525,7 +536,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     } catch (e) {
       error = true;
       if (canFail) {
-        console.warn("Error but canFail=true");
+        this.logger?.warn?.("Error but canFail=true");
         console.warn(e);
       } else {
         throw e;
@@ -605,14 +616,10 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
 
       if (isBot && itsYourTurn) {
         let boardRepr: string | undefined = undefined;
-        if ((this._verbose || this._logBoardToTrainingLog) && game.logBoard) {
+        if (this._logBoardToTrainingLog && game.logBoard) {
           boardRepr = game.logBoard({ board, playerboards });
 
-          if (this._verbose) {
-            console.log("----------------------");
-            console.log(userId, "'s turn");
-            console.log(boardRepr);
-          }
+          this.logger?.debug?.({ userId, board: boardRepr }, "turn");
         }
 
         const t0 = new Date().getTime();
@@ -695,6 +702,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
    * delta: time that passed in milli-seconds
    */
   fastForward(delta: number): void {
+    this.logger?.debug?.({ delta }, "fastForward");
     const { delayedMoves } = this;
 
     if (delayedMoves.length === 0) {
@@ -740,6 +748,11 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     } else {
       this.time += delta;
     }
+
+    this.logger?.debug?.(
+      { time: this.time, numDelayedMovesLeft: this.delayedMoves.length },
+      "fastForward done",
+    );
   }
 
   get botTrainingLog() {
