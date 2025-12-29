@@ -126,6 +126,11 @@ export class RandomMock extends Random {
     this.nextIndex = 0;
 
     for (const key of Object.getOwnPropertyNames(Random.prototype)) {
+      const proto = Object.getPrototypeOf(this);
+      // Ignore properties potentially overriden by subclasses.
+      if (Object.prototype.hasOwnProperty.call(proto, key)) {
+        continue;
+      }
       const original = (this as any)[key];
       if (typeof original === "function" && key !== "constructor") {
         (this as any)[key] = (...args: any[]) => {

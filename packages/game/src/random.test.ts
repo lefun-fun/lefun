@@ -78,4 +78,17 @@ describe("RandomMock", () => {
     expect(v2).toBe(43);
     expect(v3).toEqual([1, 2]);
   });
+
+  test("overriden methods by children classes ignore `setNextValues`", () => {
+    class MyRandom extends RandomMock {
+      shuffled<T>(array: readonly T[]): T[] {
+        return [...array];
+      }
+    }
+
+    const random = new MyRandom();
+    random.setNextValues([0, 0]);
+    const myArray = [1, 2, 3, 4, 5, 6, 7];
+    expect(random.shuffled(myArray)).toEqual(myArray);
+  });
 });
