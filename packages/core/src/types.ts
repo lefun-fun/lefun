@@ -6,7 +6,6 @@ export type MatchDataId = string;
 export type UserId = string;
 
 export type Locale = "fr" | "en";
-export const LOCALES: Locale[] = ["fr", "en"];
 
 /*
  * We have some game definition types here, namely the ones used not only in the game
@@ -153,10 +152,6 @@ export type GameStats_ = {
   // one for a single leaderboard per game.
   leaderboard: StatKey[];
   determinesRank: StatKey[];
-};
-
-export type Credits = {
-  design?: string[];
 };
 
 // Some conditional type utilities.

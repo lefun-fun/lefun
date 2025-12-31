@@ -1,6 +1,4 @@
 import {
-  AkaType,
-  Credits,
   GamePlayerSettings,
   GamePlayerSettings_,
   GameSetting_,
@@ -581,34 +579,6 @@ export function parseGame<
     minPlayers: game.minPlayers || 1,
   };
 }
-
-// Game Manifest
-export type GameManifest = {
-  // TODO: It's a string but currently we are assuming it can be parse to an integer!
-  version: string;
-  packages: {
-    ui: string;
-    game: string;
-    data?: string;
-  };
-
-  credits?: Credits;
-
-  // Keeping for backward compatibility.
-  minPlayers?: number;
-  maxPlayers?: number;
-  meta?: {
-    relatedGames: {
-      how: AkaType;
-      games: string[];
-      link: string;
-    };
-    tagline: string;
-    description: string;
-    seoAka: string;
-  };
-  name?: string;
-};
 
 /* Util to parse the diverse format that can take bot moves, as returned by `autoMove`
  * and `Agent.getMove`.
