@@ -83,11 +83,13 @@ type MakeMoveRest<
   [GetPayload<G, K>] | [GetPayload<G, K>, MakeMoveOptions]
 >;
 
+type LogMethod = (obj: unknown, msg?: unknown, ...args: unknown[]) => void;
+
 export interface Logger {
-  debug?(obj: unknown, msg?: string, ...args: unknown[]): void;
-  info?(obj: unknown, msg?: string, ...args: unknown[]): void;
-  warn?(obj: unknown, msg?: string, ...args: unknown[]): void;
-  error?(obj: unknown, msg?: string, ...args: unknown[]): void;
+  debug?: LogMethod;
+  info?: LogMethod;
+  warn?: LogMethod;
+  error?: LogMethod;
 }
 
 /*
@@ -439,6 +441,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
   }
 
   _makeBoardMove(moveName: string, payload: any = {}) {
+    this.logger?.info?.({ moveName, payload }, "board move");
     const {
       game,
       board,
@@ -500,7 +503,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
           ? [rest[0], {}]
           : rest;
 
-    this.logger?.info?.({ userId, moveName, payload }, "makeMove");
+    this.logger?.info?.({ userId, moveName, payload }, "player move");
 
     const {
       board,
@@ -618,8 +621,6 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
         let boardRepr: string | undefined = undefined;
         if (this._logBoardToTrainingLog && game.logBoard) {
           boardRepr = game.logBoard({ board, playerboards });
-
-          this.logger?.debug?.({ userId, board: boardRepr }, "turn");
         }
 
         const t0 = new Date().getTime();
@@ -702,12 +703,10 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
    * delta: time that passed in milli-seconds
    */
   fastForward(delta: number): void {
-    this.logger?.debug?.({ delta }, "fastForward");
     const { delayedMoves } = this;
 
     if (delayedMoves.length === 0) {
       this.time += delta;
-      this.logger?.debug?.({ time: this.time }, "fastForward done");
       return;
     }
 
@@ -749,11 +748,6 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     } else {
       this.time += delta;
     }
-
-    this.logger?.debug?.(
-      { time: this.time, numDelayedMovesLeft: this.delayedMoves.length },
-      "fastForward done",
-    );
   }
 
   get botTrainingLog() {
