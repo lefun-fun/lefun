@@ -265,6 +265,20 @@ function defineMoveSideEffects<GS extends GameStateBase>({
     sideEffectResults.matchHasEnded = true;
   };
 
+  const endTurnForUser = (userId: UserId) => {
+    delete sideEffectResults.beginTurn[userId];
+    sideEffectResults.endTurn[userId] = null;
+
+    // Note that this is not very efficient because we need to loop through all
+    // delayed moves, and we call this for all users.
+    sideEffectResults.delayedMoves.forEach((delayedMove, i) => {
+      if (delayedMove.userId === userId) {
+        sideEffectResults.delayedMoves.splice(i, 1);
+        return false;
+      }
+    });
+  };
+
   const turnsBegin: Turns["begin"] = (
     userIds,
     { expiresIn, playerMoveOnExpire, boardMoveOnExpire } = {},
@@ -272,6 +286,10 @@ function defineMoveSideEffects<GS extends GameStateBase>({
     let expiresAt: number | undefined = undefined;
 
     userIds = ensureArray(userIds);
+
+    for (const userId of userIds) {
+      endTurnForUser(userId);
+    }
 
     if (expiresIn !== undefined) {
       const ts = now + expiresIn;
@@ -282,6 +300,9 @@ function defineMoveSideEffects<GS extends GameStateBase>({
           continue;
         }
 
+        // TODO: We should support expiration without moves on expire.
+        // Also, currently these moves would be responsible to end the user's turn.
+        // Ideally, if the turn *expires*, it should also end the turn automatically.
         if (!playerMoveOnExpire && !boardMoveOnExpire) {
           console.error(
             "move with `expiresIn` requires `playerMoveOnExpire` or `boardMoveOnExpire`",
@@ -322,8 +343,7 @@ function defineMoveSideEffects<GS extends GameStateBase>({
   const turnsEnd: Turns["end"] = (userIds) => {
     userIds = ensureArray(userIds);
     for (const userId of userIds) {
-      sideEffectResults.endTurn[userId] = null;
-      delete sideEffectResults.beginTurn[userId];
+      endTurnForUser(userId);
     }
   };
 

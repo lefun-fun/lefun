@@ -160,8 +160,10 @@ describe("turns", () => {
     const userId = match.meta.players.allIds[0]!;
     expect(match.board.expiresAt).toBe(undefined);
 
+    expect(match.hasTurn(userId)).toBe(false);
     match.makeMove(userId, "go", {});
     expect(match.board.expiresAt).toEqual(1000);
+    expect(match.hasTurn(userId)).toBe(true);
   });
 
   test("double begin turn: only the latest counts", () => {
@@ -200,6 +202,152 @@ describe("turns", () => {
     match.makeMove(userId, "begin", { onExpire: "c" });
     match.fastForward(20);
     expect(match.board.x).toBe("ac");
+  });
+
+  // In a given `execute*` function, `turns.begin(userId, {...}); turns.end(userId)` has no effect.
+  test("end undoes begin", () => {
+    type GS = GameState<{ n: number }>;
+
+    const game = {
+      initialBoards: () => ({
+        board: { n: 0 },
+      }),
+      playerMoves: {
+        move: {
+          execute({ userId, board, turns }) {
+            board.n++;
+            turns.begin(userId, { expiresIn: 1, playerMoveOnExpire: "move" });
+            // This `end` undoes the previous `begin` so no new moves should be triggered on expiry.
+            turns.end(userId);
+          },
+        },
+      },
+      boardMoves: {
+        [INIT_MOVE]: {
+          execute({ turns }) {
+            turns.beginAll({ expiresIn: 1, playerMoveOnExpire: "move" });
+          },
+        },
+      },
+    } satisfies Game<GS>;
+
+    const match = new MatchTester<GS, typeof game>({ game });
+
+    expect(match.board.n).toEqual(0);
+    match.fastForward(0);
+    expect(match.board.n).toEqual(0);
+    match.fastForward(1);
+    expect(match.board.n).toEqual(1);
+    match.fastForward(1);
+    expect(match.board.n).toEqual(1);
+  });
+
+  test("second begin in same move overrides previous", () => {
+    type GS = GameState<{ a: number; b: number; player: string }>;
+
+    const game = {
+      initialBoards: ({ players }) => ({
+        board: { a: 0, b: 0, player: players[0]! },
+      }),
+      playerMoves: {
+        a: {
+          execute({ board, userId, turns }) {
+            board.a++;
+            turns.end(userId);
+            turns.begin(userId, { expiresIn: 1, playerMoveOnExpire: "b" });
+            turns.begin(userId, { expiresIn: 1, playerMoveOnExpire: "b" });
+          },
+        },
+        b: {
+          execute({ board }) {
+            board.b++;
+          },
+        },
+      },
+      boardMoves: {
+        [INIT_MOVE]: {
+          execute({ board, turns }) {
+            turns.begin(board.player, {
+              expiresIn: 1,
+              playerMoveOnExpire: "a",
+            });
+          },
+        },
+      },
+    } satisfies Game<GS>;
+
+    const match = new MatchTester<GS, typeof game>({ game });
+    expect(match.board.a).toEqual(0);
+    expect(match.board.b).toEqual(0);
+    match.fastForward(1);
+    expect(match.board.a).toEqual(1);
+    expect(match.board.b).toEqual(0);
+    match.fastForward(1);
+    expect(match.board.a).toEqual(1);
+    expect(match.board.b).toEqual(1);
+  });
+
+  test("fast forward 2 expiries at the same time", () => {
+    type B = {
+      n: number;
+      players: string[];
+      currentPlayer: number;
+      numNeedToPlay: number;
+    };
+
+    type GS = GameState<B>;
+
+    const game = {
+      minPlayers: 3,
+      maxPlayers: 3,
+      initialBoards: ({ players }) => ({
+        board: { n: 0, players, currentPlayer: 0, numNeedToPlay: 1 },
+      }),
+      playerMoves: {
+        move: {
+          execute({ userId, board, _ }) {
+            board.n++;
+            if (board.n >= 3) {
+              _.endMatch();
+            }
+            _.turns.end(userId);
+
+            board.numNeedToPlay--;
+
+            if (board.numNeedToPlay === 0) {
+              // Start all turns except current player.
+              _.turns.beginAll({ expiresIn: 1, playerMoveOnExpire: "move" });
+              _.turns.end(userId);
+              board.numNeedToPlay = 2;
+            }
+          },
+        },
+      },
+      boardMoves: {
+        [INIT_MOVE]: {
+          execute({ board, _ }) {
+            _.turns.begin(board.players[board.currentPlayer]!, {
+              expiresIn: 1,
+              playerMoveOnExpire: "move",
+            });
+          },
+        },
+      },
+    } satisfies Game<GS>;
+
+    type G = typeof game;
+
+    const match = new MatchTester<GS, G>({
+      game,
+    });
+
+    expect(match.board.n).toEqual(0);
+    match.fastForward(1);
+    expect(match.board.n).toEqual(1);
+    match.fastForward(1);
+    expect(match.board.n).toEqual(3);
+    match.fastForward(1);
+    expect(match.board.n).toEqual(5);
   });
 });
 
@@ -266,6 +414,47 @@ describe("fastForward", () => {
 
     match.fastForward(5000);
     expect(match.board.timestamps).toEqual([0, 1000]);
+  });
+
+  test("fast forward 2 moves at the same time", () => {
+    type B = {
+      n: number;
+    };
+
+    type GS = GameState<B>;
+
+    const game = {
+      ...gameBase,
+      initialBoards: () => ({
+        board: { n: 0 },
+      }),
+      playerMoves: {},
+      boardMoves: {
+        [INIT_MOVE]: {
+          execute({ delayMove }) {
+            delayMove("move", 10);
+            delayMove("move", 9);
+          },
+        },
+        move: {
+          execute({ board }) {
+            board.n++;
+          },
+        },
+      },
+    } satisfies Game<GS>;
+
+    type G = typeof game;
+
+    const match = new MatchTester<GS, G>({
+      game,
+      numPlayers: 1,
+    });
+
+    match.fastForward(8);
+    expect(match.board.n).toEqual(0);
+    match.fastForward(2);
+    expect(match.board.n).toEqual(2);
   });
 });
 
