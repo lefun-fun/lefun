@@ -46,7 +46,7 @@ export type MatchTesterOptions<GS extends GameStateBase, G extends Game<GS>> = {
   gameData?: any;
   matchData?: any;
   // Num *human* players
-  numPlayers: number;
+  numPlayers?: number;
   numBots?: number;
   matchSettings?: MatchSettings;
   matchPlayersSettingsArr?: MatchPlayerSettings[];
@@ -137,7 +137,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     getAgent,
     gameData = undefined,
     matchData = undefined,
-    numPlayers,
+    numPlayers = game.minPlayers || 1,
     numBots = 0,
     matchSettings = {},
     matchPlayersSettingsArr,

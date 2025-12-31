@@ -440,8 +440,8 @@ export type Game<
 
   // Min/max number of players for the game.
   // Note that a bot counts as a player!
-  minPlayers: number;
-  maxPlayers: number;
+  minPlayers?: number;
+  maxPlayers?: number;
 
   // Should we use the locale from when the match was created?
   // By default we use the locale from the users' settings which is passed to the match
@@ -463,12 +463,17 @@ export type Game_<
   BMT extends MoveTypesBase = MoveTypesBase,
 > = Omit<
   Game<GS, PMT, BMT>,
-  "playerStats" | "matchStats" | "gameSettings" | "gamePlayerSettings"
+  | "playerStats"
+  | "matchStats"
+  | "gameSettings"
+  | "gamePlayerSettings"
+  | "minPlayers"
 > & {
   playerStats?: GameStats_;
   matchStats?: GameStats_;
   gameSettings?: GameSettings_;
   gamePlayerSettings?: GamePlayerSettings_;
+  minPlayers: number;
 };
 
 function normalizeArray<T extends Record<string, any>, K extends keyof T>(
@@ -567,7 +572,14 @@ export function parseGame<
   const gamePlayerSettings =
     game.gamePlayerSettings && normalizeSettings(game.gamePlayerSettings);
 
-  return { ...game, playerStats, matchStats, gameSettings, gamePlayerSettings };
+  return {
+    ...game,
+    playerStats,
+    matchStats,
+    gameSettings,
+    gamePlayerSettings,
+    minPlayers: game.minPlayers || 1,
+  };
 }
 
 // Game Manifest

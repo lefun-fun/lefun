@@ -695,7 +695,7 @@ function SettingsButtons() {
               onClick={() => {
                 resetMatch({ numPlayers: numPlayers + 1 });
               }}
-              disabled={numPlayers >= match.game.maxPlayers}
+              disabled={numPlayers >= (match.game.maxPlayers || 10)}
             >
               Add Player
             </Button>
