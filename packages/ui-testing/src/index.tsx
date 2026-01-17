@@ -41,10 +41,10 @@ export function getUIStateFromMatchTester({
 
 export function render(
   Board: ElementType,
-  state: UIState<GameStateBase>,
+  uiState: UIState<GameStateBase>,
   locale: string = "en",
 ): RenderResult {
-  const userId = state.userId;
+  const userId = uiState.userId;
   // Sanity check
   if (userId == null) {
     throw new Error("userId should not be null");
@@ -53,13 +53,13 @@ export function render(
   // Simply create a store that always use our `state.
   setMakeMove(() => {});
   setUseSelector(() => (selector) => {
-    return selector(state);
+    return selector(uiState);
   });
   setUseSelectorShallow(() => (selector) => {
-    return selector(state);
+    return selector(uiState);
   });
 
-  setUseStore(() => state);
+  setUseStore(() => uiState);
 
   i18n.loadAndActivate({
     locale,

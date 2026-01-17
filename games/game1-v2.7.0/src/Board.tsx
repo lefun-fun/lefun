@@ -39,8 +39,8 @@ function Player({ userId }: { userId: UserId }) {
         {username} {isDead ? "💀" : "😊"}
       </span>
       <Die userId={userId} />
-      Expires in: {expiresAt ? <CountDown ts={expiresAt} /> : ""}
-      {itsMe && myLastRollAt}
+      Expires in: {expiresAt && <CountDown ts={expiresAt} />}
+      {itsMe && <span>Last roll: {myLastRollAt}</span>}
     </div>
   );
 }

@@ -75,8 +75,8 @@ export const getCurrentPlayer = (board: B) => {
   return playerOrder[currentPlayerIndex];
 };
 
-export const TURN_DURATION = 3000;
-export const MATCH_DURATION = 10_000;
+export const TURN_DURATION = 10_000;
+export const MATCH_DURATION = 20_000_000;
 
 const goToNextPlayer = ({
   board,
