@@ -760,7 +760,7 @@ const ItsMyTurn = ({ userId }: { userId: UserId }) => {
   const ref = useRef<HTMLDivElement>(null);
 
   const [itsMyTurn, setItsMyTurn] = useState(
-    () => match?.store.meta.players.byId[userId]?.itsYourTurn || false,
+    () => match?.store.meta.players.byId[userId]?.turnBeganAt !== undefined,
   );
 
   const [width, setWidth] = useState(0);
@@ -776,7 +776,8 @@ const ItsMyTurn = ({ userId }: { userId: UserId }) => {
       if (interval) {
         clearInterval(interval);
       }
-      const myTurn = match.store.meta.players.byId[userId]!.itsYourTurn;
+      const myTurn =
+        match.store.meta.players.byId[userId]!.turnBeganAt !== undefined;
       setItsMyTurn(myTurn);
 
       if (!myTurn) {
@@ -791,7 +792,7 @@ const ItsMyTurn = ({ userId }: { userId: UserId }) => {
         interval = setInterval(() => {
           const totalWidth = ref.current?.clientWidth || 0;
           const now = new Date().getTime();
-          if (!beganAt) {
+          if (beganAt === undefined) {
             console.warn("beganAt is undefined");
             return;
           }

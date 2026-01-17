@@ -584,7 +584,7 @@ test("end match ends turns", () => {
   const userId = match.meta.players.allIds[0]!;
   match.makeMove(userId, "go");
   expect(match.matchHasEnded).toBe(true);
-  expect(match.meta.players.byId[userId]?.itsYourTurn).toBe(false);
+  expect(match.meta.players.byId[userId]?.turnBeganAt).toBeUndefined();
 });
 
 test("match with timeouts for all moves ends at some point", () => {

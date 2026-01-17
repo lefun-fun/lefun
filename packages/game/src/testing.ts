@@ -366,7 +366,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
 
     // It's no-one's turn anymore.
     this.meta.players.allIds.forEach((userId) => {
-      this.meta.players.byId[userId]!.itsYourTurn = false;
+      this.meta.players.byId[userId]!.turnBeganAt = undefined;
     });
     this._isPlaying = false;
   }
@@ -615,9 +615,9 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
       ++userIndex
     ) {
       const userId = meta.players.allIds[userIndex]!;
-      const { isBot, itsYourTurn } = meta.players.byId[userId]!;
+      const { isBot, turnBeganAt } = meta.players.byId[userId]!;
 
-      if (isBot && itsYourTurn) {
+      if (isBot && turnBeganAt !== undefined) {
         let boardRepr: string | undefined = undefined;
         if (this._logBoardToTrainingLog && game.logBoard) {
           boardRepr = game.logBoard({ board, playerboards });
@@ -763,7 +763,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
   playersInTurn(): Set<UserId> {
     const result = new Set<UserId>();
     for (const userId of this.meta.players.allIds) {
-      if (this.meta.players.byId[userId]?.itsYourTurn) {
+      if (this.meta.players.byId[userId]?.turnBeganAt !== undefined) {
         result.add(userId);
       }
     }
@@ -772,7 +772,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
 
   /* Is it the given user's turn? */
   hasTurn(userId: UserId): boolean {
-    return !!this.meta.players.byId[userId]?.itsYourTurn;
+    return this.meta.players.byId[userId]?.turnBeganAt !== undefined;
   }
 }
 

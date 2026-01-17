@@ -21,13 +21,6 @@ export interface Player {
   // When in the lobby, are we ready to start. When everyone is ready the game starts.
   ready: boolean;
 
-  // Is it this player's turn?
-  // This is used to:
-  // * Trigger the "it's your turn" sounds
-  // * Show the player that it's their turn
-  // * It is NOT used to check for permission of making moves
-  itsYourTurn: boolean;
-
   // `undefined` when it's not our turn and for backward compatibility
   // (older matches won't have that field).
   turnBeganAt?: number;
@@ -118,7 +111,6 @@ export const metaAddUserToMatch = ({
 
   meta.players.byId[userId] = {
     ready: true,
-    itsYourTurn: false,
     isBot,
   };
   meta.players.allIds.splice(index, 0, userId);
@@ -157,7 +149,6 @@ export const metaBeginTurn = ({
     );
     return;
   }
-  player.itsYourTurn = true;
   player.turnBeganAt = beginsAt;
   player.turnExpiresAt = expiresAt;
 };
@@ -174,7 +165,6 @@ export const metaEndTurn = ({
     console.warn(`Trying to end turn for user ${userId} who is not in "meta"`);
     return;
   }
-  player.itsYourTurn = false;
   player.turnBeganAt = undefined;
   player.turnExpiresAt = undefined;
 };
