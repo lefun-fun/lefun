@@ -43,7 +43,9 @@ describe("turns", () => {
 
           const { expiresAt } = turns.begin(userId, {
             expiresIn: 1000,
-            playerMoveOnExpire: ["go", { itWasMe: false }],
+            onExpiration: {
+              playerMove: ["go", { itWasMe: false }],
+            },
           });
           board.expiresAt = expiresAt;
         },
@@ -63,7 +65,9 @@ describe("turns", () => {
           }
           const { expiresAt } = turns.begin(userId, {
             expiresIn: delay,
-            playerMoveOnExpire: ["beginWithDelay", { delay: 0 }],
+            onExpiration: {
+              playerMove: ["beginWithDelay", { delay: 0 }],
+            },
           });
           board.expiresAt = expiresAt;
         },
@@ -184,7 +188,9 @@ describe("turns", () => {
           execute({ userId, payload, _ }) {
             _.turns.begin(userId, {
               expiresIn: 10,
-              playerMoveOnExpire: ["add", { x: payload.onExpire }],
+              onExpiration: {
+                playerMove: ["add", { x: payload.onExpire }],
+              },
             });
           },
         } as PlayerMove<GS, { onExpire: string }>,
@@ -216,7 +222,10 @@ describe("turns", () => {
         move: {
           execute({ userId, board, turns }) {
             board.n++;
-            turns.begin(userId, { expiresIn: 1, playerMoveOnExpire: "move" });
+            turns.begin(userId, {
+              expiresIn: 1,
+              onExpiration: { playerMove: "move" },
+            });
             // This `end` undoes the previous `begin` so no new moves should be triggered on expiry.
             turns.end(userId);
           },
@@ -225,7 +234,10 @@ describe("turns", () => {
       boardMoves: {
         [INIT_MOVE]: {
           execute({ turns }) {
-            turns.beginAll({ expiresIn: 1, playerMoveOnExpire: "move" });
+            turns.beginAll({
+              expiresIn: 1,
+              onExpiration: { playerMove: "move" },
+            });
           },
         },
       },
@@ -254,8 +266,14 @@ describe("turns", () => {
           execute({ board, userId, turns }) {
             board.a++;
             turns.end(userId);
-            turns.begin(userId, { expiresIn: 1, playerMoveOnExpire: "b" });
-            turns.begin(userId, { expiresIn: 1, playerMoveOnExpire: "b" });
+            turns.begin(userId, {
+              expiresIn: 1,
+              onExpiration: { playerMove: "b" },
+            });
+            turns.begin(userId, {
+              expiresIn: 1,
+              onExpiration: { playerMove: "b" },
+            });
           },
         },
         b: {
@@ -269,7 +287,9 @@ describe("turns", () => {
           execute({ board, turns }) {
             turns.begin(board.player, {
               expiresIn: 1,
-              playerMoveOnExpire: "a",
+              onExpiration: {
+                playerMove: "a",
+              },
             });
           },
         },
@@ -316,7 +336,10 @@ describe("turns", () => {
 
             if (board.numNeedToPlay === 0) {
               // Start all turns except current player.
-              _.turns.beginAll({ expiresIn: 1, playerMoveOnExpire: "move" });
+              _.turns.beginAll({
+                expiresIn: 1,
+                onExpiration: { playerMove: "move" },
+              });
               _.turns.end(userId);
               board.numNeedToPlay = 2;
             }
@@ -328,7 +351,9 @@ describe("turns", () => {
           execute({ board, _ }) {
             _.turns.begin(board.players[board.currentPlayer]!, {
               expiresIn: 1,
-              playerMoveOnExpire: "move",
+              onExpiration: {
+                playerMove: "move",
+              },
             });
           },
         },
@@ -348,6 +373,57 @@ describe("turns", () => {
     expect(match.board.n).toEqual(3);
     match.fastForward(1);
     expect(match.board.n).toEqual(5);
+  });
+
+  test("turn ends on expire", () => {
+    type B = {
+      n: number;
+    };
+
+    type GS = GameState<B>;
+
+    const game = {
+      initialBoards: () => ({
+        board: { n: 1 },
+      }),
+      playerMoves: {
+        move: {
+          execute({ userId, turns }) {
+            turns.begin(userId, {
+              expiresIn: 10,
+              onExpiration: { playerMove: "nothing" },
+            });
+          },
+        },
+        nothing: {
+          execute() {
+            // turns.endAll();
+          },
+        },
+      },
+    } satisfies Game<GS>;
+
+    type G = typeof game;
+
+    const match = new MatchTester<GS, G>({
+      game,
+    });
+
+    const userId = match.players()[0]!;
+
+    expect(match.hasTurn(userId)).toBe(false);
+
+    match.makeMove(userId, "move");
+
+    expect(match.hasTurn(userId)).toBe(true);
+
+    match.fastForward(9);
+
+    expect(match.hasTurn(userId)).toBe(true);
+
+    match.fastForward(1);
+
+    expect(match.hasTurn(userId)).toBe(false);
   });
 });
 
@@ -603,7 +679,10 @@ test("match with timeouts for all moves ends at some point", () => {
     playerMoves: {
       inc: {
         execute({ board, userId, _ }) {
-          _.turns.begin(userId, { expiresIn: 1, playerMoveOnExpire: "inc" });
+          _.turns.begin(userId, {
+            expiresIn: 1,
+            onExpiration: { playerMove: "inc" },
+          });
           if (board.n >= 100) {
             _.endMatch();
           }
@@ -616,7 +695,9 @@ test("match with timeouts for all moves ends at some point", () => {
         execute({ board, turns }) {
           turns.begin(board.firstPlayer, {
             expiresIn: 1,
-            playerMoveOnExpire: "inc",
+            onExpiration: {
+              playerMove: "inc",
+            },
           });
         },
       },
@@ -633,4 +714,19 @@ test("match with timeouts for all moves ends at some point", () => {
   expect(match.matchHasEnded).toBe(false);
   match.fastForward(9999999999);
   expect(match.matchHasEnded).toBe(true);
+});
+
+test("allPlayers", () => {
+  type B = { x: null };
+
+  type GS = GameState<B>;
+
+  const game = {
+    initialBoards: () => ({ board: { x: null } }),
+    playerMoves: {},
+  } satisfies Game<GS>;
+
+  const match = new MatchTester<GS, typeof game>({ game, numPlayers: 3 });
+
+  expect(match.players().length).toEqual(3);
 });

@@ -75,22 +75,31 @@ export type DelayMove<BMT extends MoveTypesBase = MoveTypesBase> = <
 
 type ValueOf<T> = T[keyof T];
 
-type BeginTurnOptions<
+export type BeginTurnOptions<
   PMT extends MoveTypesBase = MoveTypesBase,
   BMT extends MoveTypesBase = MoveTypesBase,
-> = {
-  expiresIn?: number;
-  boardMoveOnExpire?: IfAny<
-    ValueOf<BMT>,
-    string | [string, any],
-    MoveObjFromMT<BMT>
-  >;
-  playerMoveOnExpire?: IfAny<
-    ValueOf<PMT>,
-    string | [string, any],
-    MoveObjFromMT<PMT>
-  >;
-};
+> =
+  | Record<string, never>
+  | {
+      // Undefined means "no expiration" in which case the "move on expiration" is ignored.
+      expiresIn: number | undefined;
+
+      onExpiration:
+        | {
+            boardMove: IfAny<
+              ValueOf<BMT>,
+              string | [string, any],
+              MoveObjFromMT<BMT>
+            >;
+          }
+        | {
+            playerMove: IfAny<
+              ValueOf<PMT>,
+              string | [string, any],
+              MoveObjFromMT<PMT>
+            >;
+          };
+    };
 
 export type Turns<
   PMT extends MoveTypesBase = MoveTypesBase,

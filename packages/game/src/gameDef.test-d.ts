@@ -49,53 +49,71 @@ test("PlayerMove - fully-typed", () => {
 
       turns.begin("userId", {
         expiresIn: 1000,
-        // @ts-expect-error missing payload
-        boardMoveOnExpire: "boardMove",
+        onExpiration: {
+          // @ts-expect-error missing payload
+          boardMove: "boardMove",
+        },
       });
 
       turns.begin("userId", {
         expiresIn: 1000,
-        // @ts-expect-error wrong arg
-        boardMoveOnExpire: ["boardMove", { patate: 123 }],
+        onExpiration: {
+          // @ts-expect-error wrong arg
+          boardMove: ["boardMove", { patate: 123 }],
+        },
       });
 
       turns.begin("userId", {
         expiresIn: 1000,
-        boardMoveOnExpire: ["boardMove", { payload: "patate" }],
+        onExpiration: {
+          boardMove: ["boardMove", { payload: "patate" }],
+        },
       });
 
       turns.begin("userId", {
         expiresIn: 1000,
-        // @ts-expect-error wrong move name
-        playerMoveOnExpire: "patate",
+        onExpiration: {
+          // @ts-expect-error wrong move name
+          playerMove: "patate",
+        },
       });
 
       turns.begin("userId", {
         expiresIn: 1000,
-        // @ts-expect-error extra arg
-        playerMoveOnExpire: ["move1", { a: 2 }],
+        onExpiration: {
+          // @ts-expect-error extra arg
+          playerMove: ["move1", { a: 2 }],
+        },
       });
 
       turns.begin("userId", {
         expiresIn: 1000,
-        playerMoveOnExpire: "move1",
+        onExpiration: {
+          playerMove: "move1",
+        },
       });
 
       turns.begin("userId", {
         expiresIn: 1000,
-        // @ts-expect-error missing arg
-        playerMoveOnExpire: "move2",
+        onExpiration: {
+          // @ts-expect-error missing arg
+          playerMove: "move2",
+        },
       });
 
       turns.begin("userId", {
         expiresIn: 1000,
-        // @ts-expect-error wrong arg
-        playerMoveOnExpire: ["move2", { a: "abc" }],
+        onExpiration: {
+          // @ts-expect-error wrong arg
+          playerMove: ["move2", { a: "abc" }],
+        },
       });
 
       turns.begin("userId", {
         expiresIn: 1000,
-        playerMoveOnExpire: ["move2", { a: 123 }],
+        onExpiration: {
+          playerMove: ["move2", { a: 123 }],
+        },
       });
     },
   };
@@ -120,17 +138,29 @@ test("PlayerMove - payload-typed", () => {
       delayMove("boardMove", { payload: "patate" }, 123);
 
       // Everything goes when we don't have PMT/BMT typing.
+      turns.begin("userId", {
+        expiresIn: 123,
+        onExpiration: { playerMove: "move1" },
+      });
+      turns.begin("userId", {
+        expiresIn: 123,
+        onExpiration: {
+          playerMove: ["move1", { arg: 123 }],
+        },
+      });
+      turns.begin("userId", {
+        expiresIn: 123,
+        onExpiration: { boardMove: "move2" },
+      });
+      turns.begin("userId", {
+        expiresIn: 123,
+        onExpiration: {
+          boardMove: ["move2", { arg: 123 }],
+        },
+      });
+
+      // @ts-expect-error missing arg
       turns.begin("userId", { expiresIn: 123 });
-      turns.begin("userId", { expiresIn: 123, playerMoveOnExpire: "move1" });
-      turns.begin("userId", {
-        expiresIn: 123,
-        playerMoveOnExpire: ["move1", { arg: 123 }],
-      });
-      turns.begin("userId", { expiresIn: 123, boardMoveOnExpire: "move2" });
-      turns.begin("userId", {
-        expiresIn: 123,
-        boardMoveOnExpire: ["move2", { arg: 123 }],
-      });
     },
   };
 });
@@ -287,24 +317,32 @@ test("moves inlined in the game with PMT and BMT - they are used", () => {
 
           turns.begin("userId", {
             expiresIn: 123,
-            playerMoveOnExpire: "move1",
+            onExpiration: {
+              playerMove: "move1",
+            },
           });
 
           turns.begin("userId", {
             expiresIn: 123,
-            // @ts-expect-error missing arg
-            playerMoveOnExpire: "move2",
+            onExpiration: {
+              // @ts-expect-error missing arg
+              playerMove: "move2",
+            },
           });
 
           turns.begin("userId", {
             expiresIn: 123,
-            // @ts-expect-error extra arg
-            playerMoveOnExpire: ["move1", { a: 123 }],
+            onExpiration: {
+              // @ts-expect-error extra arg
+              playerMove: ["move1", { a: 123 }],
+            },
           });
 
           turns.begin("userId", {
             expiresIn: 123,
-            playerMoveOnExpire: ["move2", { a: 123 }],
+            onExpiration: {
+              playerMove: ["move2", { a: 123 }],
+            },
           });
         },
       },

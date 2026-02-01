@@ -105,7 +105,9 @@ const goToNextPlayer = ({
 
   turns.begin(nextPlayer, {
     expiresIn: TURN_DURATION,
-    boardMoveOnExpire: ["kill", { userId: nextPlayer }],
+    onExpiration: {
+      boardMove: ["kill", { userId: nextPlayer }],
+    },
   });
 };
 

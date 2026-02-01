@@ -250,7 +250,13 @@ class Backend extends EventTarget {
 
     if (type === "playerMove") {
       try {
-        this.makeMove({ userId, name, payload });
+        this.makeMove({
+          userId,
+          name,
+          payload,
+          isExpiration: true,
+          moveId: undefined,
+        });
       } catch (e) {
         console.error("error in delayed player move", e);
       } finally {
@@ -258,7 +264,7 @@ class Backend extends EventTarget {
       }
     } else if (type === "boardMove") {
       try {
-        this.makeBoardMove(name, payload);
+        this.makeBoardMove(name, payload, { isExpiration: true });
       } catch (e) {
         console.error("error in delayed board move", e);
       } finally {
@@ -270,12 +276,19 @@ class Backend extends EventTarget {
   }
 
   /* Both player and board moves */
-  _makeMove(
-    name: string,
-    payload: any,
-    userId: UserId | null = null,
-    moveId?: string,
-  ) {
+  _makeMove({
+    userId,
+    name,
+    payload,
+    moveId,
+    isExpiration,
+  }: {
+    userId: UserId | null;
+    name: string;
+    payload: any;
+    moveId: string | undefined;
+    isExpiration: boolean;
+  }) {
     if (this.store.matchStatus == "over") {
       throw new Error("match is over");
     }
@@ -300,6 +313,7 @@ class Backend extends EventTarget {
         meta,
         matchData,
         gameData,
+        isExpiration,
       });
     } else {
       result = executeBoardMove({
@@ -314,6 +328,7 @@ class Backend extends EventTarget {
         meta,
         matchData,
         gameData,
+        isExpiration,
       });
     }
 
@@ -404,25 +419,45 @@ class Backend extends EventTarget {
     saveBackendToLocalStorage(this, this.gameId);
   }
 
-  makeBoardMove(name: string, payload: any) {
+  makeBoardMove(
+    name: string,
+    payload: any,
+    { isExpiration }: { isExpiration: boolean },
+  ) {
     console.warn("board move", name, payload);
-    this._makeMove(name, payload, null);
+    this._makeMove({
+      name,
+      payload,
+      userId: null,
+      moveId: undefined,
+      isExpiration,
+    });
   }
 
+  /* Player move */
   makeMove({
     userId,
     name,
     payload,
     moveId,
+    isExpiration,
   }: {
     userId: UserId;
     name: string;
     payload: any;
-    moveId?: string;
-  }) {
+  } & (
+    | {
+        moveId: string;
+        isExpiration: false;
+      }
+    | {
+        moveId: undefined;
+        isExpiration: true;
+      }
+  )) {
     console.warn("move", name, payload, "by user", userId);
     try {
-      this._makeMove(name, payload, userId, moveId);
+      this._makeMove({ name, payload, userId, moveId, isExpiration });
     } catch (e) {
       console.error("There was an error executing move", name, e);
       this.dispatchEvent(

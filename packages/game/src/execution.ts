@@ -100,12 +100,13 @@ type BoardMoveExecutionInput<GS extends GameStateBase> = {
   now: number;
   random: Random;
   meta: Meta;
+  // Indicates whether the move is being executed because of a turn expiration.
+  isExpiration: boolean;
 };
 
 type PlayerMoveExecutionInput<GS extends GameStateBase> =
   BoardMoveExecutionInput<GS> & {
     userId: UserId;
-    skipCanDo?: boolean;
     onlyExecuteNow?: boolean;
   };
 
@@ -121,9 +122,9 @@ export function executePlayerMove<GS extends GameStateBase>({
   gameData,
   now,
   random,
-  skipCanDo = false,
   onlyExecuteNow = false,
   meta,
+  isExpiration,
 }: PlayerMoveExecutionInput<GS>): MoveExecutionOutput {
   // This is a "normal" player move.
   const moveDef = game.playerMoves[name];
@@ -139,7 +140,6 @@ export function executePlayerMove<GS extends GameStateBase>({
   const { canDo, executeNow, execute } = moveDef;
 
   if (
-    !skipCanDo &&
     canDo &&
     !canDo({
       userId,
@@ -157,6 +157,12 @@ export function executePlayerMove<GS extends GameStateBase>({
     meta,
     now,
   });
+
+  // For expiration moves, if the player's turn was not explicitely begun,
+  // it means their turn should end.
+  if (isExpiration && sideEffectResults.beginTurn[userId] === undefined) {
+    sideEffectResults.endTurn[userId] = null;
+  }
 
   const allPatches: Patch[] = [];
 
@@ -244,6 +250,9 @@ const ensureArray = <T>(x: T | T[]): T[] => {
   return x;
 };
 
+/*
+ * Returns the side effects results and the functions that will populate them.
+ */
 function defineMoveSideEffects<GS extends GameStateBase>({
   game,
   meta,
@@ -279,10 +288,9 @@ function defineMoveSideEffects<GS extends GameStateBase>({
     });
   };
 
-  const turnsBegin: Turns["begin"] = (
-    userIds,
-    { expiresIn, playerMoveOnExpire, boardMoveOnExpire } = {},
-  ) => {
+  const turnsBegin: Turns["begin"] = (userIds, turnBeginOptions = {}) => {
+    const { expiresIn, onExpiration } = turnBeginOptions;
+
     let expiresAt: number | undefined = undefined;
 
     userIds = ensureArray(userIds);
@@ -300,27 +308,12 @@ function defineMoveSideEffects<GS extends GameStateBase>({
           continue;
         }
 
-        // TODO: We should support expiration without moves on expire.
-        // Also, currently these moves would be responsible to end the user's turn.
-        // Ideally, if the turn *expires*, it should also end the turn automatically.
-        if (!playerMoveOnExpire && !boardMoveOnExpire) {
-          console.error(
-            "move with `expiresIn` requires `playerMoveOnExpire` or `boardMoveOnExpire`",
-          );
-          continue;
-        }
+        const { move, type } =
+          "playerMove" in onExpiration
+            ? { move: onExpiration.playerMove, type: "playerMove" as const }
+            : { move: onExpiration.boardMove, type: "boardMove" as const };
 
-        if (playerMoveOnExpire && boardMoveOnExpire) {
-          console.error(
-            "turn can not define both `playerMoveOnExpire` and `boardMoveOnExpire`",
-          );
-          continue;
-        }
-
-        const type = playerMoveOnExpire ? "playerMove" : "boardMove";
-        const { name, payload } = parseMove(
-          (playerMoveOnExpire || boardMoveOnExpire)!,
-        );
+        const { name, payload } = parseMove(move);
         sideEffectResults.delayedMoves.push({
           type,
           userId,

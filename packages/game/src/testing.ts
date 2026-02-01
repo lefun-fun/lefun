@@ -68,7 +68,10 @@ export type BotTrainingLogItem =
 
 type EmptyObject = Record<string, never>;
 
-type MakeMoveOptions = { canFail?: boolean; isDelayed?: boolean };
+type MakeMoveOptions = {
+  canFail?: boolean;
+  isExpiration?: boolean;
+};
 
 type MakeMoveRest<
   G extends Game<any>,
@@ -440,7 +443,11 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     }
   }
 
-  _makeBoardMove(moveName: string, payload: any = {}) {
+  _makeBoardMove(
+    moveName: string,
+    payload: any = {},
+    { isExpiration }: { isExpiration: boolean } = { isExpiration: false },
+  ): void {
     this.logger?.info?.({ moveName, payload }, "board move");
     const {
       game,
@@ -466,6 +473,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
       now: time,
       game,
       random,
+      isExpiration,
     });
 
     {
@@ -496,7 +504,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     moveName: K,
     ...rest: MakeMoveRest<G, K>
   ) {
-    const [payload, { canFail = false, isDelayed = false }] =
+    const [payload, { canFail = false, isExpiration = false }] =
       rest.length === 0
         ? [undefined, {}]
         : rest.length === 1
@@ -520,6 +528,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     let error = false;
     let output: ReturnType<typeof executePlayerMove<GS>> | undefined =
       undefined;
+
     try {
       output = executePlayerMove<GS>({
         name: moveName,
@@ -534,7 +543,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
         now: time,
         game,
         random,
-        skipCanDo: !!isDelayed,
+        isExpiration,
       });
     } catch (e) {
       error = true;
@@ -733,10 +742,10 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
           this.makeMove(
             userId,
             name,
-            ...([payload, { isDelayed: true }] as any),
+            ...([payload, { isExpiration: true }] as any),
           );
         } else {
-          this._makeBoardMove(name, payload);
+          this._makeBoardMove(name, payload, { isExpiration: true });
         }
       }
 

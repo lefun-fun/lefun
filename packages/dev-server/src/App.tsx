@@ -138,13 +138,13 @@ const BoardForPlayer = ({
           secretboard: null,
           now: new Date().getTime(),
           random: backend.random,
-          skipCanDo: false,
           onlyExecuteNow: true,
           // Note that technically we should not use anything from
           // `match.store` as this represents the DB.
           matchData: backend.store.matchData,
           gameData: backend.store.gameData,
           meta: backend.store.meta,
+          isExpiration: false,
         });
       } catch (e) {
         console.warn(
@@ -161,7 +161,7 @@ const BoardForPlayer = ({
       optimisticBoards.current.makeMove(moveId, patches);
 
       // Run the move in the backend also.
-      backend.makeMove({ userId, name, payload, moveId });
+      backend.makeMove({ userId, name, payload, moveId, isExpiration: false });
     });
 
     const { users } = mainStore;

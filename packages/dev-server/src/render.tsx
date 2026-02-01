@@ -248,7 +248,7 @@ async function render({
     store.setState(() => ({ match: backend }));
 
     // Start the match with the first "INIT_MOVE" board move.
-    backend.makeBoardMove(INIT_MOVE, {});
+    backend.makeBoardMove(INIT_MOVE, {}, { isExpiration: false });
   };
 
   store.setState(() => ({ game: game_, resetMatch }));
