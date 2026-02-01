@@ -37,88 +37,6 @@ importers:
         specifier: ^8.37.0
         version: 8.37.0(eslint@9.31.0(jiti@1.21.6))(typescript@5.5.4)
 
-  games/game1-v2.5.3:
-    dependencies:
-      classnames:
-        specifier: ^2.5.1
-        version: 2.5.1
-    devDependencies:
-      '@babel/preset-react':
-        specifier: ^7.24.7
-        version: 7.24.7(@babel/core@7.24.9)
-      '@lefun/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@lefun/dev-server':
-        specifier: workspace:*
-        version: link:../../packages/dev-server
-      '@lefun/game':
-        specifier: workspace:*
-        version: link:../../packages/game
-      '@lefun/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
-      '@lingui/cli':
-        specifier: ^4.11.2
-        version: 4.11.2(typescript@5.5.4)
-      '@lingui/conf':
-        specifier: ^4.11.2
-        version: 4.11.2(typescript@5.5.4)
-      '@lingui/macro':
-        specifier: ^4.11.2
-        version: 4.11.2(@lingui/react@4.11.2(react@18.3.1))(babel-plugin-macros@3.1.0)(typescript@5.5.4)
-      '@lingui/react':
-        specifier: ^4.11.2
-        version: 4.11.2(react@18.3.1)
-      '@lingui/vite-plugin':
-        specifier: ^4.11.2
-        version: 4.11.2(typescript@5.5.4)(vite@5.3.5(@types/node@20.14.10))
-      '@rollup/plugin-babel':
-        specifier: ^6.0.4
-        version: 6.0.4(@babel/core@7.24.9)(@types/babel__core@7.20.5)(rollup@4.20.0)
-      '@rollup/plugin-commonjs':
-        specifier: ^26.0.1
-        version: 26.0.1(rollup@4.20.0)
-      '@rollup/plugin-node-resolve':
-        specifier: ^15.2.3
-        version: 15.2.3(rollup@4.20.0)
-      '@rollup/plugin-typescript':
-        specifier: ^11.1.6
-        version: 11.1.6(rollup@4.20.0)(tslib@2.6.3)(typescript@5.5.4)
-      '@types/react':
-        specifier: ^18.3.3
-        version: 18.3.3
-      '@types/react-dom':
-        specifier: ^18.3.0
-        version: 18.3.0
-      '@vitejs/plugin-react':
-        specifier: ^4.3.1
-        version: 4.3.1(vite@5.3.5(@types/node@20.14.10))
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.3.1
-        version: 18.3.1(react@18.3.1)
-      rollup:
-        specifier: ^4.18.1
-        version: 4.20.0
-      rollup-plugin-copy:
-        specifier: ^3.5.0
-        version: 3.5.0
-      rollup-plugin-postcss:
-        specifier: ^4.0.2
-        version: 4.0.2(postcss@8.4.40)
-      typescript:
-        specifier: ^5.5.4
-        version: 5.5.4
-      vite:
-        specifier: ^5.3.4
-        version: 5.3.5(@types/node@20.14.10)
-      vitest:
-        specifier: ^2.0.5
-        version: 2.0.5(@types/node@20.14.10)
-
   games/game1-v2.7.0:
     dependencies:
       classnames:
@@ -3148,6 +3066,7 @@ packages:
 
   lodash.get@4.4.2:
     resolution: {integrity: sha512-z+Uw/vLuy6gQe8cfaFWD7p0wVv8fJl3mbzXh33RS+0oW2wvUqiRXiQ69gLWSLpgB5/6sU+r6BlQR0MBILadqTQ==}
+    deprecated: This package is deprecated. Use the optional chaining (?.) operator instead.
 
   lodash.ismatch@4.4.0:
     resolution: {integrity: sha512-fPMfXjGQEV9Xsq/8MTSgUf255gawYRbjwMyDbcvDhXgV7enSZA0hynz6vMPnpAb5iONEzBHBPsT+0zes5Z301g==}
@@ -4338,6 +4257,7 @@ packages:
   source-map@0.8.0-beta.0:
     resolution: {integrity: sha512-2ymg6oRBpebeZi9UUNsgQ89bhx01TcTkmNTGnNO88imTmbSgy4nfujrgVEFKWpMTEGA11EDkTt7mqObTPdigIA==}
     engines: {node: '>= 8'}
+    deprecated: The work that was done in this beta branch won't be included in future versions
 
   sourcemap-codec@1.4.8:
     resolution: {integrity: sha512-9NykojV5Uih4lgo5So5dtw+f0JgJX30KCNI8gwhz2J9A15wD0Ml6tjHKwf6fTSa6fAdVBdZeNOs9eJ71qCk8vA==}
