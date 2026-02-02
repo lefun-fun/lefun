@@ -1,6 +1,6 @@
 {
   "name": "@lefun/game",
-  "version": "3.0.0-alpha.0",
+  "version": "3.0.0-alpha.1",
   "description": "Main dependency for writing game logic at https://lefun.fun.",
   "author": "Simon Lemieux",
   "repository": {
@@ -37,7 +37,7 @@
     "@lefun/core": "workspace:*"
   },
   "dependencies": {
-    "lodash-es": "^4.17.21",
-    "immer": "^10.1.1"
+    "immer": "^10.1.1",
+    "lodash-es": "^4.17.21"
   }
 }
