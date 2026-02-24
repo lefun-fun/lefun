@@ -112,7 +112,10 @@ const goToNextPlayer = ({
 };
 
 const pass: PM = {
-  executeNow({ board, turns }) {
+  executeNow({ board, turns, userId }) {
+    if (getCurrentPlayer(board) !== userId) {
+      throw new Error("not your turn!");
+    }
     goToNextPlayer({ board, turns });
   },
 };
