@@ -85,6 +85,7 @@ export type MoveExecutionOutput = {
   board: object;
   playerboards: Record<UserId, object | null>;
   secretboard: object | null;
+  meta: Meta;
   patches: Patch[];
 } & SideEffectResults;
 
@@ -104,28 +105,55 @@ type BoardMoveExecutionInput<GS extends GameStateBase> = {
   isExpiration: boolean;
 };
 
-type PlayerMoveExecutionInput<GS extends GameStateBase> =
-  BoardMoveExecutionInput<GS> & {
-    userId: UserId;
-    onlyExecuteNow?: boolean;
-  };
+type PlayerMoveExecutionInput<GS extends GameStateBase> = {
+  name: string;
+  payload: unknown;
+  game: Game_<GS>;
+  board: GS["B"];
+  playerboards: Record<UserId, GS["PB"]>;
+  // `secretboard` is not strictly required for player moves, but we allow passing `null` already.
+  secretboard: GS["SB"];
+  meta: Meta;
+  isExpiration: boolean;
+  userId: UserId;
+  now: number;
+} & (
+  | {
+      // If onlyExecuteNow is `false` (or missing), then we need everything.
+      onlyExecuteNow?: false;
+      matchData: unknown;
+      gameData: unknown;
+      random: Random;
+    }
+  | {
+      // If onlyExecuteNow is `true`, then the "execute"-only options are
+      // not required.
+      onlyExecuteNow: true;
+      // We still make them optional to make the calling more flexible.
+      matchData?: unknown;
+      gameData?: unknown;
+      random?: Random;
+    }
+);
 
-export function executePlayerMove<GS extends GameStateBase>({
-  name,
-  payload,
-  game,
-  userId,
-  board,
-  playerboards,
-  secretboard,
-  matchData,
-  gameData,
-  now,
-  random,
-  onlyExecuteNow = false,
-  meta,
-  isExpiration,
-}: PlayerMoveExecutionInput<GS>): MoveExecutionOutput {
+export function executePlayerMove<GS extends GameStateBase>(
+  options: PlayerMoveExecutionInput<GS>,
+): MoveExecutionOutput {
+  const {
+    name,
+    payload,
+    game,
+    matchData,
+    gameData,
+    userId,
+    now,
+    isExpiration,
+    random,
+    onlyExecuteNow = false,
+  } = options;
+
+  let { board, playerboards, secretboard, meta } = options;
+
   // This is a "normal" player move.
   const moveDef = game.playerMoves[name];
 
@@ -186,6 +214,7 @@ export function executePlayerMove<GS extends GameStateBase>({
         });
       },
     );
+
     if (error) {
       throw error as Error;
     }
@@ -196,6 +225,10 @@ export function executePlayerMove<GS extends GameStateBase>({
   }
 
   if (execute && retValue !== false && !onlyExecuteNow) {
+    if (random === undefined) {
+      throw new Error('"random" is required to run "execute"');
+    }
+
     const { output, patches, error } = tryProduceWithPatches(
       { board, playerboards, secretboard },
       ({ board, playerboards, secretboard }) => {
@@ -223,10 +256,26 @@ export function executePlayerMove<GS extends GameStateBase>({
     allPatches.push(...patches);
   }
 
+  // Deal with the turns which modify `meta`.
+  {
+    const { beginTurn, endTurn } = sideEffectResults;
+
+    const { meta: newMeta, patches } = updateMetaWithTurnInfo({
+      meta,
+      beginTurn,
+      endTurn,
+      now,
+    });
+
+    meta = newMeta;
+    allPatches.push(...patches);
+  }
+
   return {
     board,
     playerboards,
     secretboard,
+    meta,
     patches: allPatches,
     ...sideEffectResults,
   };
@@ -461,10 +510,26 @@ export function executeBoardMove<GS extends GameStateBase>({
 
   ({ board, playerboards, secretboard } = output);
 
+  // Deal with the turns which modify `meta`.
+  {
+    const { beginTurn, endTurn } = sideEffectResults;
+
+    const { meta: newMeta, patches: metaPatches } = updateMetaWithTurnInfo({
+      meta,
+      beginTurn,
+      endTurn,
+      now,
+    });
+
+    meta = newMeta;
+    patches.push(...metaPatches);
+  }
+
   return {
     board,
     playerboards,
     secretboard,
+    meta,
     patches,
     ...sideEffectResults,
   };

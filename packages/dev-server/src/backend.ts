@@ -17,7 +17,6 @@ import {
   Game_,
   MoveExecutionOutput,
   Random,
-  updateMetaWithTurnInfo,
 } from "@lefun/game";
 import { User } from "@lefun/ui";
 
@@ -338,22 +337,12 @@ class Backend extends EventTarget {
 
     // Update the store.
     {
-      const { board, playerboards, secretboard } = result;
+      const { board, playerboards, secretboard, meta } = result;
       store.board = board;
       store.playerboards = playerboards;
       store.secretboard = secretboard;
+      store.meta = meta;
     }
-
-    // Update meta
-    const { beginTurn, endTurn } = result;
-    const { meta: newMeta, patches: metaPatches } = updateMetaWithTurnInfo({
-      meta,
-      beginTurn,
-      endTurn,
-      now,
-    });
-
-    store.meta = newMeta;
 
     // Send out patches to users.
     {
@@ -366,12 +355,12 @@ class Backend extends EventTarget {
       const { patches } = result;
 
       separatePatchesByUser({
-        patches: [...patches, ...metaPatches],
+        patches,
         userIds,
         patchesOut: patchesByUserId,
       });
 
-      // Add the `meta` patches to everyone.
+      // Add the patches to everyone.
 
       for (const [userId, patches] of Object.entries(patchesByUserId)) {
         if (patches.length === 0) {

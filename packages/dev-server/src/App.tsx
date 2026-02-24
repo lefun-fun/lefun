@@ -137,13 +137,10 @@ const BoardForPlayer = ({
           playerboards: { [userId]: optimisticBoards.current.playerboard },
           secretboard: null,
           now: new Date().getTime(),
-          random: backend.random,
           onlyExecuteNow: true,
           // Note that technically we should not use anything from
           // `match.store` as this represents the DB.
-          matchData: backend.store.matchData,
-          gameData: backend.store.gameData,
-          meta: backend.store.meta,
+          meta: optimisticBoards.current.meta,
           isExpiration: false,
         });
       } catch (e) {

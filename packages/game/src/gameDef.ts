@@ -275,6 +275,7 @@ export type InitialPlayerboardOptions<GS extends GameStateBase> = {
   gameData: any;
   matchData?: any;
 };
+
 /*
  * Object that `autoMove` can return to help train reinforcement learning models.
  */
