@@ -448,7 +448,7 @@ class Backend extends EventTarget {
     try {
       this._makeMove({ name, payload, userId, moveId, isExpiration });
     } catch (e) {
-      console.error("There was an error executing move", name, e);
+      console.warn("BACKEND: There was an error executing move", name, e);
       this.dispatchEvent(
         new CustomEvent(REVERT_MOVE_EVENT, { detail: { moveId } }),
       );

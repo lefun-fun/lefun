@@ -87,26 +87,47 @@ const EndMatchCountDown = () => {
   return <CountDown ts={endsAt} />;
 };
 
-function Board() {
+const Sum = () => {
+  const sum = useSelector((state) => state.board.sum);
+  return <div>Sum: {sum}</div>;
+};
+
+const Buttons = () => {
   const makeMove = useMakeMove();
+  const itsMyTurn = useSelector(
+    (state) => getCurrentPlayer(state.board) === state.userId,
+  );
+  return (
+    <>
+      <button
+        className={classNames(!itsMyTurn && "disabled")}
+        onClick={() => makeMove("roll")}
+      >
+        <Trans>Roll</Trans>
+      </button>
+      <button
+        className={classNames(!itsMyTurn && "disabled")}
+        onClick={() => makeMove("pass")}
+      >
+        <Trans>Pass</Trans>
+      </button>
+    </>
+  );
+};
+
+function Board() {
   const players = useSelectorShallow((state) =>
     Object.keys(state.board.players),
   );
 
   const matchSettings = useSelector((state) => state.board.matchSettings);
 
-  const sum = useSelector((state) => state.board.sum);
-
-  const itsMyTurn = useSelector(
-    (state) => getCurrentPlayer(state.board) === state.userId,
-  );
-
   return (
     <div className="outer">
       <div className="inner">
         <div>
           <Trans>The template game</Trans>
-          <div>Sum: {sum}</div>
+          <Sum />
           <EndMatchCountDown />
           {Object.entries(matchSettings).map(([key, value]) => (
             <div key={key}>
@@ -118,20 +139,7 @@ function Board() {
           ))}
         </div>
 
-        <>
-          <button
-            className={classNames(!itsMyTurn && "disabled")}
-            onClick={() => makeMove("roll")}
-          >
-            <Trans>Roll</Trans>
-          </button>
-          <button
-            className={classNames(!itsMyTurn && "disabled")}
-            onClick={() => makeMove("pass")}
-          >
-            <Trans>Pass</Trans>
-          </button>
-        </>
+        <Buttons />
       </div>
     </div>
   );

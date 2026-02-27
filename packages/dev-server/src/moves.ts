@@ -1,9 +1,19 @@
 import { applyPatches, Patch } from "immer";
+import { createStore, StoreApi } from "zustand";
 
-import { Meta } from "@lefun/core";
+import { Meta, UserId } from "@lefun/core";
 import { GameStateBase } from "@lefun/game";
+import { User } from "@lefun/ui";
 
-import { deepCopy } from "./utils";
+type Store<GS extends GameStateBase> = {
+  board: GS["B"];
+  playerboard: GS["PB"];
+  meta: Meta;
+  userId: UserId;
+  users: Record<UserId, User>;
+  timeDelta: number;
+  timeLatency: number;
+};
 
 export class OptimisticBoards<GS extends GameStateBase = GameStateBase> {
   _confirmedBoard: GS["B"];
@@ -11,33 +21,51 @@ export class OptimisticBoards<GS extends GameStateBase = GameStateBase> {
   _confirmedMeta: Meta;
   // The player's moves that have not been confirmed yet
   _pendingMoves: { moveId: string; patches: Patch[] }[];
-  // ConfirmedBoard + pending moves updates: this is what we will display.
-  board: GS["B"];
-  // `null` for spectators. Note that GS["PB"] can itself be `null` for games without playerboards.
-  playerboard: GS["PB"] | null;
 
-  meta: Meta;
+  store: StoreApi<Store<GS>>;
 
   constructor({
     board,
     playerboard,
     meta,
+    userId,
+    users,
   }: {
     board: GS["B"];
     playerboard: GS["PB"] | null;
     meta: Meta;
+    userId: UserId;
+    users: Record<UserId, User>;
   }) {
-    board = deepCopy(board);
-    playerboard = deepCopy(playerboard);
-    meta = deepCopy(meta);
-
     this._confirmedBoard = board;
     this._confirmedPlayerboard = playerboard;
     this._confirmedMeta = meta;
     this._pendingMoves = [];
-    this.board = board;
-    this.playerboard = playerboard;
-    this.meta = meta;
+
+    this.store = this._createStore({ userId, users });
+  }
+
+  /* Create the zustand store */
+  _createStore({
+    userId,
+    users,
+  }: {
+    userId: UserId;
+    users: Record<UserId, User>;
+  }) {
+    const store = createStore<Store<GS>>()(() => ({
+      // These will contain the confirmed boards + patches from the pending moves.
+      board: this._confirmedBoard,
+      playerboard: this._confirmedPlayerboard,
+      meta: this._confirmedMeta,
+      //
+      userId,
+      users,
+      timeDelta: 0,
+      timeLatency: 0,
+    }));
+
+    return store;
   }
 
   _getMoveIndex(moveId: string): number {
@@ -51,18 +79,18 @@ export class OptimisticBoards<GS extends GameStateBase = GameStateBase> {
   }
 
   _replay() {
-    let board = this._confirmedBoard;
-    let playerboard = this._confirmedPlayerboard;
-    let meta = this._confirmedMeta;
-    for (const { patches } of this._pendingMoves) {
-      ({ board, playerboard, meta } = applyPatches(
-        { board, playerboard, meta },
-        patches,
-      ));
-    }
-    this.board = board;
-    this.playerboard = playerboard;
-    this.meta = meta;
+    this.store.setState((oldState) => {
+      let newState = {
+        board: this._confirmedBoard,
+        playerboard: this._confirmedPlayerboard,
+        meta: this._confirmedMeta,
+      };
+
+      for (const { patches } of this._pendingMoves) {
+        newState = applyPatches(newState, patches);
+      }
+      return { ...oldState, ...newState };
+    });
   }
 
   makeMove(moveId: string, patches: Patch[]) {
@@ -86,12 +114,13 @@ export class OptimisticBoards<GS extends GameStateBase = GameStateBase> {
    * have the `executeNow` patches.
    */
   confirmMove({ moveId, patches }: { moveId?: string; patches: Patch[] }) {
-    // Start from the confirmed boards
+    // Add the patches to the confirmedBoard, changing at few fields as possible (using Immer).
     const {
       _confirmedBoard: board,
       _confirmedPlayerboard: playerboard,
       _confirmedMeta: meta,
     } = this;
+
     {
       const state = applyPatches({ board, playerboard, meta }, patches);
       this._confirmedBoard = state.board;
