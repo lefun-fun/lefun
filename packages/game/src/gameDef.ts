@@ -147,8 +147,6 @@ export type MoveSideEffects<
   logMatchStat: LogMatchStat<MS>;
 };
 
-// TODO Add `ts` in the options here
-// https://github.com/lefun-fun/lefun/issues/52
 type ExecuteNowOptions<
   GS extends GameStateBase,
   P,
@@ -162,6 +160,7 @@ type ExecuteNowOptions<
   // Assume that the game developer has defined the playerboard if they're using it.
   playerboard: GS["PB"];
   payload: P;
+  ts: number;
   _: MoveSideEffects<PMT, BMT, PS, MS>;
 } & MoveSideEffects<PMT, BMT, PS, MS>;
 

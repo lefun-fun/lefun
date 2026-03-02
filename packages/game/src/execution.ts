@@ -209,6 +209,7 @@ export function executePlayerMove<GS extends GameStateBase>(
           playerboard: playerboards[userId]!,
           userId,
           payload,
+          ts: now,
           _: moveSideEffects,
           ...moveSideEffects,
         });
