@@ -1,3 +1,6 @@
+.PHONY: all
+all: fix check test
+
 .PHONY: install
 install:
 	pnpm install

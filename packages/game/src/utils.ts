@@ -17,7 +17,3 @@ export function parseMove<M extends string | [string, any]>(
   const [name, payload] = move;
   return { name, payload };
 }
-
-export function deepCopy<T>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj));
-}

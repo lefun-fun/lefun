@@ -124,13 +124,10 @@ export function makeUseMakeMove<G extends Game<GameStateAny>>() {
 /*
  * Util to check if the user is a player (if not they are a spectator).
  */
-export const useIsPlayer = <GS extends GameStateBase>() => {
-  // Currently, the user is a player iif its playerboard is defined.
-  const hasPlayerboard = useSelector((state: UIState<GS>) => {
-    return !!state.playerboard;
+export const useIsPlayer = <GS extends GameStateBase>() =>
+  useSelector((state: UIState<GS>) => {
+    return state.meta.players.byId[state.userId] !== undefined;
   });
-  return hasPlayerboard;
-};
 
 type TimeAdjust = "none" | "after" | "before";
 

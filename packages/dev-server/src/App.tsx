@@ -7,7 +7,9 @@ import classNames from "classnames";
 import { enablePatches, Patch } from "immer";
 import { JsonEditor } from "json-edit-react";
 import { ReactNode, RefObject, useEffect, useRef, useState } from "react";
-import { proxy, snapshot, useSnapshot } from "valtio";
+import { useStore as useStoreZustand } from "zustand";
+import { shallow } from "zustand/shallow";
+import { useStoreWithEqualityFn } from "zustand/traditional";
 
 import {
   GameId,
@@ -15,7 +17,6 @@ import {
   GameSetting,
   GameSettings_,
   Locale,
-  Meta,
   UserId,
 } from "@lefun/core";
 import {
@@ -42,7 +43,7 @@ import { OptimisticBoards } from "./moves";
 import { useStore } from "./store";
 import { generateId } from "./utils";
 
-const LATENCY = 100;
+const LATENCY = 200;
 
 enablePatches();
 
@@ -80,22 +81,20 @@ const BoardForPlayer = ({
   }, [locale, messages]);
 
   const [loading, setLoading] = useState(true);
+  const { store: mainStore } = backend;
+  const { users } = mainStore;
 
-  // Here we use `valtio` as a test to see how well it works as a local state
-  // management solution. So far it's pretty good, perhaps we should also use it for the dev-server settings!
   const optimisticBoards = useRef(
-    proxy(
-      new OptimisticBoards({
-        board: backend.store.board,
-        playerboard: backend.store.playerboards[userId] || null,
-        meta: backend.store.meta,
-      }),
-    ),
+    new OptimisticBoards({
+      board: backend.store.board,
+      playerboard: backend.store.playerboards[userId] || null,
+      meta: backend.store.meta,
+      userId,
+      users,
+    }),
   );
 
   useEffect(() => {
-    const { store: mainStore } = backend;
-
     backend.addEventListener(patchesForUserEvent(userId), (event: any) => {
       if (!event) {
         return;
@@ -127,23 +126,23 @@ const BoardForPlayer = ({
 
       let result: MoveExecutionOutput | null = null;
 
+      const { board, playerboard, meta } =
+        optimisticBoards.current.store.getState();
+
       try {
         result = executePlayerMove({
           name,
           payload,
           game: backend.game,
           userId,
-          board: optimisticBoards.current.board,
-          playerboards: { [userId]: optimisticBoards.current.playerboard },
+          board,
+          playerboards: { [userId]: playerboard },
           secretboard: null,
           now: new Date().getTime(),
-          random: backend.random,
           onlyExecuteNow: true,
           // Note that technically we should not use anything from
           // `match.store` as this represents the DB.
-          matchData: backend.store.matchData,
-          gameData: backend.store.gameData,
-          meta: backend.store.meta,
+          meta,
           isExpiration: false,
         });
       } catch (e) {
@@ -164,26 +163,12 @@ const BoardForPlayer = ({
       backend.makeMove({ userId, name, payload, moveId, isExpiration: false });
     });
 
-    const { users } = mainStore;
-
     const _useSelector = (): UseSelector<GameStateBase> => {
       // We wrap it to respect the rules of hooks.
       const useSelector = <GS extends GameStateBase, T>(
         selector: Selector<GS, T>,
       ): T => {
-        const snapshot = useSnapshot(optimisticBoards.current);
-        const board = snapshot.board;
-        const playerboard = snapshot.playerboard;
-        const meta = snapshot.meta as Meta;
-        return selector({
-          board,
-          playerboard,
-          meta,
-          userId,
-          users,
-          timeDelta: 0,
-          timeLatency: 0,
-        });
+        return useStoreZustand(optimisticBoards.current.store, selector);
       };
       return useSelector;
     };
@@ -191,23 +176,27 @@ const BoardForPlayer = ({
     setUseSelector(_useSelector);
 
     setUseStore(() => {
-      const playerboard = optimisticBoards.current.playerboard;
-      return {
-        board: snapshot(optimisticBoards.current.board),
-        playerboard: playerboard === null ? null : snapshot(playerboard),
-        meta: snapshot(optimisticBoards.current.meta) as Meta,
-        userId,
-        users,
-        timeDelta: 0,
-        timeLatency: 0,
-      };
+      return optimisticBoards.current.store.getState();
     });
 
-    // As far as I know, valtio does not support shallow selectors, but if I understand correctly it's not a concern with Valtio.
-    setUseSelectorShallow(_useSelector);
+    const _useSelectorShallow = (): UseSelector<GameStateBase> => {
+      // We wrap it to respect the rules of hooks.
+      const useSelector = <GS extends GameStateBase, T>(
+        selector: Selector<GS, T>,
+      ): T => {
+        return useStoreWithEqualityFn(
+          optimisticBoards.current.store,
+          selector,
+          shallow,
+        );
+      };
+      return useSelector;
+    };
+
+    setUseSelectorShallow(_useSelectorShallow);
 
     setLoading(false);
-  }, [userId, backend, gameId]);
+  }, [userId, backend, gameId, users]);
 
   if (loading) {
     return <div>Loading player...</div>;
