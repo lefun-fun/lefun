@@ -43,7 +43,7 @@ import { OptimisticBoards } from "./moves";
 import { useStore } from "./store";
 import { generateId } from "./utils";
 
-const LATENCY = 200;
+const LATENCY = 500;
 
 enablePatches();
 
