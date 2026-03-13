@@ -25,11 +25,15 @@ check:
 fix:
 	pnpm fix
 
+.PHONY: clean
+clean:
+	rm -rf dist; find . -name node_modules -exec rm -r {} \;
+
 .PHONY: bump-version
 bump-version:
 	pnpm lerna version --force-publish --no-private --no-git-tag-version
 	$(MAKE) fix
 
 .PHONY: publish
-publish: check test build
+publish: clean install build check test
 	pnpm publish --access public --filter=@lefun/*
