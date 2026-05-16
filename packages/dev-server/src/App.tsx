@@ -759,7 +759,7 @@ const ItsMyTurn = ({ userId }: { userId: UserId }) => {
       return;
     }
 
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval> | null = null;
 
     const handler = () => {
       if (interval) {
