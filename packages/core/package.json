@@ -18,13 +18,12 @@
   "scripts": {
     "build": "pnpm run clean && pnpm run compile",
     "clean": "rm -rf ./dist",
-    "compile": "rollup --config",
-    "watch": "rollup --config --watch",
+    "compile": "esbuild src/index.ts --bundle --format=esm --outfile=dist/esm/index.js --sourcemap --packages=external && tsc --emitDeclarationOnly",
+    "watch": "esbuild src/index.ts --bundle --format=esm --outfile=dist/esm/index.js --sourcemap --packages=external --watch",
     "test": "vitest run src"
   },
   "devDependencies": {
-    "@rollup/plugin-typescript": "^12.3.0",
-    "rollup": "^4.60.4",
+    "esbuild": "^0.25.12",
     "typescript": "^5.5.4",
     "vitest": "^4.1.6"
   }

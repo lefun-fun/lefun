@@ -1,6 +1,3 @@
-// We import the CSS here so that rollup picks it up.
-import "./index.css";
-
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import classNames from "classnames";
