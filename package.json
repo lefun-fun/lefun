@@ -29,6 +29,11 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.3"
   },
+  "pnpm": {
+    "overrides": {
+      "handlebars": ">=4.7.9"
+    }
+  },
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
