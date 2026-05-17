@@ -62,7 +62,7 @@
   },
   "dependencies": {
     "classnames": "^2.5.1",
-    "immer": "^10.1.1",
+    "immer": "^11.1.8",
     "json-edit-react": "^1.29.1",
     "use-sync-external-store": "^1.6.0",
     "zustand": "^5.0.13"
