@@ -267,7 +267,6 @@ async function render({
   }
 
   // We import the CSS using the package name because this is what will be needed by packages importing this.
-  // @ts-expect-error Make typescript happy.
   await import("@lefun/dev-server/index.css");
   let content = <Main />;
 
