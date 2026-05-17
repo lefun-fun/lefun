@@ -1,6 +1,6 @@
 import "./index.css";
 
-import { Trans } from "@lingui/macro";
+import { Trans } from "@lingui/react/macro";
 import classNames from "classnames";
 import { useEffect, useState } from "react";
 

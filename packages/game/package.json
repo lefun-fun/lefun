@@ -24,14 +24,13 @@
   },
   "devDependencies": {
     "@lefun/core": "workspace:*",
-    "@rollup/plugin-commonjs": "^25.0.8",
-    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-commonjs": "^29.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
     "@types/lodash-es": "^4.17.12",
-    "rollup": "^2.79.1",
-    "rollup-plugin-typescript2": "^0.31.2",
-    "tslib": "^2.6.3",
+    "rollup": "^4.60.4",
     "typescript": "^5.5.4",
-    "vitest": "^2.0.5"
+    "vitest": "^4.1.6"
   },
   "peerDependencies": {
     "@lefun/core": "workspace:*"

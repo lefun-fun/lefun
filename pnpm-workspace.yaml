@@ -8,3 +8,9 @@ packages:
   - games/*/game
   - games/*/ui
   - games/*
+
+allowBuilds:
+  esbuild: true
+  nx: true
+
+minimumReleaseAge: 1440

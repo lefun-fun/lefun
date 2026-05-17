@@ -1,6 +1,6 @@
 import commonjs from "@rollup/plugin-commonjs";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
-import typescript from "rollup-plugin-typescript2";
+import typescript from "@rollup/plugin-typescript";
 
 export default {
   input: {
@@ -9,7 +9,8 @@ export default {
   },
   output: [
     {
-      dir: "dist/esm",
+      dir: "dist",
+      entryFileNames: "esm/[name].js",
       format: "esm",
       sourcemap: true,
     },
@@ -17,7 +18,7 @@ export default {
   plugins: [
     commonjs(),
     nodeResolve(),
-    typescript({ useTsconfigDeclarationDir: true }),
+    typescript({ declarationDir: "./dist/types", outDir: "./dist" }),
   ],
   external: [/node_modules/],
 };

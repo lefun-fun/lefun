@@ -1,12 +1,13 @@
 import commonjs from "@rollup/plugin-commonjs";
 import nodeResolve from "@rollup/plugin-node-resolve";
-import typescript from "rollup-plugin-typescript2";
+import typescript from "@rollup/plugin-typescript";
 
 export default {
   input: "src/index.ts",
   output: [
     {
-      file: "dist/esm/index.js",
+      dir: "dist",
+      entryFileNames: "esm/[name].js",
       format: "esm",
       sourcemap: true,
     },
@@ -14,7 +15,7 @@ export default {
   plugins: [
     commonjs(),
     nodeResolve(),
-    typescript({ useTsconfigDeclarationDir: true }),
+    typescript({ declarationDir: "./dist/types", outDir: "./dist" }),
   ],
 
   external: ["@lefun/core"],

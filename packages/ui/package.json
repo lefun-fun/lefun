@@ -34,31 +34,31 @@
     "watch": "rollup --config --watch"
   },
   "dependencies": {
-    "zustand": "^4.5.4"
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@lefun/core": "workspace:*",
     "@lefun/game": "workspace:*",
-    "@lingui/cli": "^4.11.2",
-    "@lingui/conf": "^4.11.2",
-    "@lingui/macro": "^4.11.2",
-    "@rollup/plugin-commonjs": "^21.1.0",
-    "@rollup/plugin-node-resolve": "^13.3.0",
-    "@types/node": "^20.14.10",
-    "@types/react": "18.3.3",
-    "@types/react-dom": "18.3.0",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "rollup": "^2.79.1",
-    "rollup-plugin-typescript2": "^0.36.0",
-    "tslib": "^2.6.3",
+    "@lingui/cli": "^6.0.1",
+    "@lingui/conf": "^6.0.1",
+    "@rollup/plugin-commonjs": "^29.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "rollup": "^4.60.4",
     "typescript": "^5.5.4",
-    "vitest": "^2.0.5"
+    "vitest": "^4.1.6"
   },
   "peerDependencies": {
     "@lefun/core": "workspace:*",
     "@lefun/game": "workspace:*",
-    "react": ">=17.0.2",
-    "react-dom": ">=17.0.2"
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "@lingui/cli": ">=6.0.0",
+    "@lingui/conf": ">=6.0.0"
   }
 }

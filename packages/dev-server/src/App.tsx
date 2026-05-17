@@ -256,7 +256,9 @@ const PlayerStats = ({ userId }: { userId: UserId }) => {
   );
 };
 
-function useSetDimensionCssVariablesOnResize(ref: RefObject<HTMLElement>) {
+function useSetDimensionCssVariablesOnResize(
+  ref: RefObject<HTMLElement | null>,
+) {
   const [height, setHeight] = useState(0);
   const [width, setWidth] = useState(0);
 
@@ -759,7 +761,7 @@ const ItsMyTurn = ({ userId }: { userId: UserId }) => {
       return;
     }
 
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
 
     const handler = () => {
       if (interval) {
@@ -903,7 +905,7 @@ function RulesIframe() {
 function Dimensions({
   componentRef,
 }: {
-  componentRef: RefObject<HTMLDivElement>;
+  componentRef: RefObject<HTMLDivElement | null>;
 }) {
   const showDim = useStore((state) => state.showDimensions);
 
