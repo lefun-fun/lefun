@@ -4,7 +4,8 @@
   "compilerOptions": {
     "outDir": "./dist",
     "declarationDir": "./dist/types",
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "rootDir": "./src"
   },
   "include": ["src/**/*"]
 }

@@ -15,9 +15,7 @@ export default {
   plugins: [
     nodeResolve(),
     commonjs(),
-    typescript({
-      exclude: ["lingui.config.ts", "src/main.tsx"],
-    }),
+    typescript(),
     babel({
       babelHelpers: "bundled",
       extensions: [".tsx", ".ts"],

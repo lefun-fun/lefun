@@ -13,7 +13,7 @@ export default {
   plugins: [
     nodeResolve(),
     commonjs(),
-    typescript({ tsconfig: "./tsconfig.json" }),
+    typescript(),
     postcss({ extract: true }),
   ],
   external: [

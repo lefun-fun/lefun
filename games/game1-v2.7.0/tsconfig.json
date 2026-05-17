@@ -11,8 +11,9 @@
     "esModuleInterop": true,
     "outDir": "dist",
     "declarationDir": "dist/types",
+    "rootDir": "./src",
     "jsx": "preserve",
     "moduleResolution": "bundler"
   },
-  "include": ["src/**/*", "lingui.config.ts"]
+  "include": ["src/**/*"]
 }

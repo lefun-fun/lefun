@@ -10,5 +10,5 @@ export default {
       sourcemap: true,
     },
   ],
-  plugins: [typescript({ declarationDir: "./dist/types", outDir: "./dist" })],
+  plugins: [typescript()],
 };
