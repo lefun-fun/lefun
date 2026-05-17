@@ -751,12 +751,12 @@ function Settings() {
       {view === "game" && (
         <>
           {!!gameSettings?.allIds?.length && (
-            <div className="flex-initial max-h-1/8 overflow-y-auto">
+            <div className="flex-initial max-h-[12.5%] overflow-y-auto">
               <MatchSettingsView gameSettings={gameSettings} />
             </div>
           )}
           {!!gamePlayerSettings?.allIds?.length && (
-            <div className="flex-initial max-h-1/8 overflow-y-auto">
+            <div className="flex-initial max-h-[12.5%] overflow-y-auto">
               <PlayerSettingsView gamePlayerSettings={gamePlayerSettings} />
             </div>
           )}
@@ -940,7 +940,7 @@ function Dimensions({
     return null;
   }
   return (
-    <div className="z-10 absolute top-0 right-0 bg-black bg-opacity-10 px-1">
+    <div className="z-10 absolute top-0 right-0 bg-black/10 px-1">
       {Math.round(width)} x {Math.round(height)}
     </div>
   );
