@@ -18,8 +18,8 @@
   "scripts": {
     "build": "pnpm run clean && pnpm run compile",
     "clean": "rm -rf ./dist",
-    "compile": "rollup --config",
-    "watch": "rollup --config --watch"
+    "compile": "esbuild src/index.tsx --bundle --format=esm --outdir=dist/esm --sourcemap --packages=external && tsc --emitDeclarationOnly",
+    "watch": "esbuild src/index.tsx --bundle --format=esm --outdir=dist/esm --sourcemap --packages=external --watch"
   },
   "dependencies": {
     "@testing-library/react": "^16.3.2",
@@ -31,13 +31,10 @@
     "@lefun/ui": "workspace:*",
     "@lingui/core": "^6.0.1",
     "@lingui/react": "^6.0.1",
-    "@rollup/plugin-commonjs": "^29.0.2",
-    "@rollup/plugin-node-resolve": "^16.0.3",
-    "@rollup/plugin-typescript": "^12.3.0",
     "@types/react": "^19.2.14",
+    "esbuild": "^0.25.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "rollup": "^4.60.4",
     "typescript": "^6.0.3"
   },
   "peerDependencies": {

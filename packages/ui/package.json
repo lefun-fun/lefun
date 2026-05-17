@@ -17,21 +17,21 @@
   ],
   "exports": {
     ".": {
+      "types": "./dist/types/index.d.ts",
       "import": "./dist/esm/index.js",
-      "default": "./dist/esm/index.js",
-      "types": "./dist/types/index.d.ts"
+      "default": "./dist/esm/index.js"
     },
     "./lefunExtractor": {
+      "types": "./dist/types/lefunExtractor.d.ts",
       "import": "./dist/esm/lefunExtractor.js",
-      "default": "./dist/esm/lefunExtractor.js",
-      "types": "./dist/types/lefunExtractor.d.ts"
+      "default": "./dist/esm/lefunExtractor.js"
     }
   },
   "scripts": {
     "build": "pnpm run clean && pnpm run compile",
     "clean": "rm -rf ./dist",
-    "compile": "rollup --config",
-    "watch": "rollup --config --watch"
+    "compile": "esbuild src/index.ts src/lefunExtractor.ts --bundle --format=esm --outdir=dist/esm --sourcemap --packages=external && tsc --emitDeclarationOnly",
+    "watch": "esbuild src/index.ts src/lefunExtractor.ts --bundle --format=esm --outdir=dist/esm --sourcemap --packages=external --watch"
   },
   "dependencies": {
     "zustand": "^5.0.13"
@@ -41,15 +41,12 @@
     "@lefun/game": "workspace:*",
     "@lingui/cli": "^6.0.1",
     "@lingui/conf": "^6.0.1",
-    "@rollup/plugin-commonjs": "^29.0.2",
-    "@rollup/plugin-node-resolve": "^16.0.3",
-    "@rollup/plugin-typescript": "^12.3.0",
     "@types/node": "^25.8.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.25.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "rollup": "^4.60.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
   },

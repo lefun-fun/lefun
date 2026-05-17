@@ -18,17 +18,14 @@
   "scripts": {
     "build": "pnpm run clean && pnpm run compile",
     "clean": "rm -rf ./dist",
-    "compile": "rollup --config",
-    "watch": "rollup --config --watch",
+    "compile": "esbuild src/index.ts --bundle --format=esm --outdir=dist/esm --sourcemap --external:@lefun/core && tsc --emitDeclarationOnly",
+    "watch": "esbuild src/index.ts --bundle --format=esm --outdir=dist/esm --sourcemap --external:@lefun/core --watch",
     "test": "vitest run src"
   },
   "devDependencies": {
     "@lefun/core": "workspace:*",
-    "@rollup/plugin-commonjs": "^29.0.2",
-    "@rollup/plugin-node-resolve": "^16.0.3",
-    "@rollup/plugin-typescript": "^12.3.0",
     "@types/lodash-es": "^4.17.12",
-    "rollup": "^4.60.4",
+    "esbuild": "^0.25.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
   },
