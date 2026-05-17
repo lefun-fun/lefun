@@ -156,7 +156,7 @@ async function render({
   const game_ = parseGame(game);
 
   const urlParams = new URLSearchParams(window.location.search);
-  let locale = urlParams.get("l") as Locale;
+  const locale = urlParams.get("l") as Locale;
   const isRules = urlParams.get("v") === "rules";
 
   if (isRules) {
@@ -209,8 +209,6 @@ async function render({
   if (locale) {
     throw new Error("locale should not be defined at this point");
   }
-
-  locale = store.getState().locale;
 
   const resetMatch = ({
     numPlayers,

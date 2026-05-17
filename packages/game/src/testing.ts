@@ -635,7 +635,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
         const t0 = new Date().getTime();
         const agent = this._agents[userId];
 
-        let botMove: BotMove<G> | undefined = undefined;
+        let botMove: BotMove<G> | undefined;
 
         const args = {
           board,

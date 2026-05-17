@@ -96,7 +96,7 @@ export const metaAddUserToMatch = ({
 
   // Index at which we add the user. If it's a bot, we add them at the end. If it's a
   // human we add him before the bots.
-  let index = 0;
+  let index: number;
   if (isBot) {
     index = meta.players.allIds.length;
   } else {

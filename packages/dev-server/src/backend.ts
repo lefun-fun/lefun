@@ -297,7 +297,7 @@ class Backend extends EventTarget {
     const { meta, board, playerboards, secretboard, matchData, gameData } =
       store;
 
-    let result: MoveExecutionOutput | null = null;
+    let result: MoveExecutionOutput;
     if (userId) {
       result = executePlayerMove({
         name,

@@ -95,7 +95,7 @@ const BoardForPlayer = ({
   );
 
   useEffect(() => {
-    backend.addEventListener(patchesForUserEvent(userId), (event: any) => {
+    const handler = (event: any) => {
       if (!event) {
         return;
       }
@@ -106,96 +106,120 @@ const BoardForPlayer = ({
       setTimeout(() => {
         optimisticBoards.current.confirmMove({ moveId, patches });
       }, LATENCY);
-    });
+    };
 
-    backend.addEventListener(REVERT_MOVE_EVENT, (event: any) => {
+    backend.addEventListener(patchesForUserEvent(userId), handler);
+
+    return () => {
+      backend.removeEventListener(patchesForUserEvent(userId), handler);
+    };
+  }, [backend, userId]);
+
+  useEffect(() => {
+    const handler = (event: any) => {
       const { moveId } = event.detail;
       optimisticBoards.current.revertMove(moveId);
-    });
+    };
+    backend.addEventListener(REVERT_MOVE_EVENT, handler);
+    return () => {
+      backend.removeEventListener(REVERT_MOVE_EVENT, handler);
+    };
+  });
 
-    setMakeMove((name, payload) => {
-      if (userId === "spectator") {
-        console.warn("spectator cannot make moves");
-        return;
-      }
+  useEffect(() => {
+    const setup = () => {
+      setMakeMove((name, payload) => {
+        if (userId === "spectator") {
+          console.warn("spectator cannot make moves");
+          return;
+        }
 
-      if (backend.store.matchStatus === "over") {
-        console.warn("match is over");
-        return;
-      }
+        if (backend.store.matchStatus === "over") {
+          console.warn("match is over");
+          return;
+        }
 
-      let result: MoveExecutionOutput | null = null;
+        let result: MoveExecutionOutput;
 
-      const { board, playerboard, meta } =
-        optimisticBoards.current.store.getState();
+        const { board, playerboard, meta } =
+          optimisticBoards.current.store.getState();
 
-      try {
-        result = executePlayerMove({
+        try {
+          result = executePlayerMove({
+            name,
+            payload,
+            game: backend.game,
+            userId,
+            board,
+            playerboards: { [userId]: playerboard },
+            secretboard: null,
+            now: new Date().getTime(),
+            onlyExecuteNow: true,
+            // Note that technically we should not use anything from
+            // `match.store` as this represents the DB.
+            meta,
+            isExpiration: false,
+          });
+        } catch (e) {
+          console.warn(
+            `Ignoring move "${name}" for user "${userId}" because of error`,
+          );
+          console.warn(e);
+          return;
+        }
+
+        let { patches } = result;
+        patches = patches.map(reformatPlayerboardPatch);
+
+        const moveId = generateId();
+        optimisticBoards.current.makeMove(moveId, patches);
+
+        // Run the move in the backend also.
+        backend.makeMove({
+          userId,
           name,
           payload,
-          game: backend.game,
-          userId,
-          board,
-          playerboards: { [userId]: playerboard },
-          secretboard: null,
-          now: new Date().getTime(),
-          onlyExecuteNow: true,
-          // Note that technically we should not use anything from
-          // `match.store` as this represents the DB.
-          meta,
+          moveId,
           isExpiration: false,
         });
-      } catch (e) {
-        console.warn(
-          `Ignoring move "${name}" for user "${userId}" because of error`,
-        );
-        console.warn(e);
-        return;
-      }
+      });
 
-      let { patches } = result;
-      patches = patches.map(reformatPlayerboardPatch);
-
-      const moveId = generateId();
-      optimisticBoards.current.makeMove(moveId, patches);
-
-      // Run the move in the backend also.
-      backend.makeMove({ userId, name, payload, moveId, isExpiration: false });
-    });
-
-    const _useSelector = (): UseSelector<GameStateBase> => {
-      // We wrap it to respect the rules of hooks.
-      const useSelector = <GS extends GameStateBase, T>(
-        selector: Selector<GS, T>,
-      ): T => {
-        return useStoreZustand(optimisticBoards.current.store, selector);
+      const _useSelector = (): UseSelector<GameStateBase> => {
+        // We wrap it to respect the rules of hooks.
+        const useSelector = <GS extends GameStateBase, T>(
+          selector: Selector<GS, T>,
+        ): T => {
+          return useStoreZustand(optimisticBoards.current.store, selector);
+        };
+        return useSelector;
       };
-      return useSelector;
+
+      setUseSelector(_useSelector);
+
+      setUseStore(() => {
+        return optimisticBoards.current.store.getState();
+      });
+
+      const _useSelectorShallow = (): UseSelector<GameStateBase> => {
+        // We wrap it to respect the rules of hooks.
+        const useSelector = <GS extends GameStateBase, T>(
+          selector: Selector<GS, T>,
+        ): T => {
+          return useStoreWithEqualityFn(
+            optimisticBoards.current.store,
+            selector,
+            shallow,
+          );
+        };
+        return useSelector;
+      };
+
+      setUseSelectorShallow(_useSelectorShallow);
+
+      setLoading(false);
     };
 
-    setUseSelector(_useSelector);
-
-    setUseStore(() => {
-      return optimisticBoards.current.store.getState();
-    });
-
-    const _useSelectorShallow = (): UseSelector<GameStateBase> => {
-      // We wrap it to respect the rules of hooks.
-      const useSelector = <GS extends GameStateBase, T>(
-        selector: Selector<GS, T>,
-      ): T => {
-        return useStoreWithEqualityFn(
-          optimisticBoards.current.store,
-          selector,
-          shallow,
-        );
-      };
-      return useSelector;
-    };
-
-    setUseSelectorShallow(_useSelectorShallow);
-
-    setLoading(false);
+    setup();
   }, [userId, backend, gameId, users]);
 
   if (loading) {
@@ -828,6 +852,7 @@ function PlayerIframe({ userId }: { userId: UserId }) {
   const { href } = window.location;
 
   // Force reloading the iframe when the component is rendered.
+  // eslint-disable-next-line
   const key = Math.random();
 
   return (
