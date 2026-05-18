@@ -1,6 +1,6 @@
 {
   "name": "@lefun/dev-server",
-  "version": "3.0.0-alpha.3",
+  "version": "3.0.0-alpha.4",
   "description": "Development server to run games developed for https://lefun.fun.",
   "author": "Simon Lemieux",
   "repository": {
@@ -35,9 +35,9 @@
     "@lefun/ui": "workspace:*",
     "@lingui/core": "^6.0.1",
     "@lingui/react": "^6.0.1",
+    "@tailwindcss/postcss": "^4.3.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@tailwindcss/postcss": "^4.3.0",
     "esbuild": "^0.28.0",
     "postcss-cli": "^11.0.1",
     "react": "^19.2.6",
