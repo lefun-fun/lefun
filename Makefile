@@ -27,7 +27,7 @@ fix:
 
 .PHONY: clean
 clean:
-	rm -rf dist; find . -name node_modules -exec rm -r {} \;
+	rm -rf dist; find . -name node_modules -exec rm -rf {} \;
 
 .PHONY: bump-version
 bump-version:
