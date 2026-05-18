@@ -9,6 +9,32 @@ export default defineConfig({
     babel({ presets: [linguiTransformerBabelPreset()] }),
     lingui(),
   ],
+  build: {
+    lib: {
+      entry: {
+        game: "src/game.ts",
+        ui: "src/ui.tsx",
+        backend: "src/backend.ts",
+      },
+      formats: ["es"],
+    },
+    rollupOptions: {
+      external: [
+        "@lingui/react",
+        "react",
+        "react/jsx-runtime",
+        "react-dom",
+        "@lefun/core",
+        "@lefun/game",
+        "@lefun/ui",
+      ],
+      output: {
+        assetFileNames: (info) =>
+          info.name?.endsWith(".css") ? "index.css" : "[name][extname]",
+      },
+    },
+    sourcemap: true,
+  },
   resolve: {
     dedupe: ["react", "react-dom"],
     mainFields: ["module", "main"],
