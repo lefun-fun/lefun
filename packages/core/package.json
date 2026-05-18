@@ -23,7 +23,7 @@
     "test": "vitest run src"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
   }
