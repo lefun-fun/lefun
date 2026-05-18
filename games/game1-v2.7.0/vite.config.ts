@@ -35,8 +35,4 @@ export default defineConfig({
     },
     sourcemap: true,
   },
-  resolve: {
-    dedupe: ["react", "react-dom"],
-    mainFields: ["module", "main"],
-  },
 });
