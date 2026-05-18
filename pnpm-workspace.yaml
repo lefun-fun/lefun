@@ -14,3 +14,6 @@ allowBuilds:
   nx: true
 
 minimumReleaseAge: 1440
+
+overrides:
+  handlebars: ">=4.7.9"
