@@ -188,8 +188,8 @@ export function executePlayerMove<GS extends GameStateBase>(
 
   // For expiration moves, if the player's turn was not explicitely begun,
   // it means their turn should end.
-  if (isExpiration && sideEffectResults.beginTurn[userId] === undefined) {
-    sideEffectResults.endTurn[userId] = null;
+  if (isExpiration && !sideEffectResults.beginTurn.has(userId)) {
+    sideEffectResults.endTurn.set(userId, null);
   }
 
   const allPatches: Patch[] = [];
@@ -282,8 +282,8 @@ export function executePlayerMove<GS extends GameStateBase>(
   };
 }
 
-type BeginTurn = Record<UserId, { expiresAt?: number }>;
-type EndTurn = Record<UserId, null>;
+export type BeginTurn = Map<UserId, { expiresAt?: number }>;
+export type EndTurn = Map<UserId, null>;
 
 type SideEffectResults = {
   matchHasEnded: boolean;
@@ -314,8 +314,8 @@ function defineMoveSideEffects<GS extends GameStateBase>({
 }): { sideEffectResults: SideEffectResults; moveSideEffects: MoveSideEffects } {
   const sideEffectResults: SideEffectResults = {
     matchHasEnded: false,
-    beginTurn: {},
-    endTurn: {},
+    beginTurn: new Map(),
+    endTurn: new Map(),
     delayedMoves: [],
     stats: [],
   };
@@ -325,8 +325,8 @@ function defineMoveSideEffects<GS extends GameStateBase>({
   };
 
   const endTurnForUser = (userId: UserId) => {
-    delete sideEffectResults.beginTurn[userId];
-    sideEffectResults.endTurn[userId] = null;
+    sideEffectResults.beginTurn.delete(userId);
+    sideEffectResults.endTurn.set(userId, null);
 
     // Note that this is not very efficient because we need to loop through all
     // delayed moves, and we call this for all users.
@@ -376,8 +376,8 @@ function defineMoveSideEffects<GS extends GameStateBase>({
     }
 
     for (const userId of userIds) {
-      sideEffectResults.beginTurn[userId] = { expiresAt };
-      delete sideEffectResults.endTurn[userId];
+      sideEffectResults.beginTurn.set(userId, { expiresAt });
+      sideEffectResults.endTurn.delete(userId);
     }
 
     return { expiresAt };
@@ -553,7 +553,7 @@ export function updateMetaWithTurnInfo({
     (draft: { meta: Meta }) => {
       const { meta } = draft;
 
-      for (const [userId, { expiresAt }] of Object.entries(beginTurn)) {
+      for (const [userId, { expiresAt }] of beginTurn.entries()) {
         metaBeginTurn({
           meta,
           beginsAt: now,
@@ -562,7 +562,7 @@ export function updateMetaWithTurnInfo({
         });
       }
 
-      for (const userId of Object.keys(endTurn)) {
+      for (const userId of endTurn.keys()) {
         metaEndTurn({
           meta,
           userId,

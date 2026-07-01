@@ -14,7 +14,9 @@ import {
 import { IfAnyNull } from "@lefun/core";
 
 import {
+  BeginTurn,
   DelayedMove,
+  EndTurn,
   executeBoardMove,
   executePlayerMove,
   Stat,
@@ -391,8 +393,8 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     stats,
   }: {
     matchHasEnded: boolean;
-    beginTurn: Record<UserId, { expiresAt?: number }>;
-    endTurn: Record<UserId, null>;
+    beginTurn: BeginTurn;
+    endTurn: EndTurn;
     delayedMoves: DelayedMove[];
     stats: Stat[];
   }) {

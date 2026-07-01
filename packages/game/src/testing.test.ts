@@ -606,7 +606,7 @@ test("error in move does not get applied", () => {
 
   expect(() => {
     match.makeMove(userId, "incrementWithError");
-  }).toThrowError("error");
+  }).toThrow("error");
 
   expect(match.board.x).toBe(0);
 });
@@ -637,7 +637,7 @@ test("canFail", () => {
 
   expect(() => {
     match.makeMove(userId, "go", null, { canFail: false });
-  }).toThrowError("error");
+  }).toThrow("error");
 
   expect(match.board.x).toBe(0);
 });
