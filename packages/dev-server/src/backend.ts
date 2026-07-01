@@ -392,11 +392,11 @@ class Backend extends EventTarget {
     }
 
     // Also cancel move expiry timeouts for users whose turn has ended.
-    for (const userId of Object.keys(result.endTurn)) {
+    for (const userId of result.endTurn.keys()) {
       this._removeDelayedMoveForUser(userId);
     }
 
-    for (const userId of Object.keys(result.beginTurn)) {
+    for (const userId of result.beginTurn.keys()) {
       this._removeDelayedMoveForUser(userId);
     }
 
