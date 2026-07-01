@@ -22,7 +22,7 @@ test("happy path", () => {
   match.makeMove(p0, "roll");
   match.makeMove(p1, "roll");
   match.makeMove(p2, "roll");
-  expect(() => match.makeMove(p1, "roll")).toThrowError("not your turn");
+  expect(() => match.makeMove(p1, "roll")).toThrow("not your turn");
   match.makeMove(p0, "roll");
   match.makeMove(p1, "roll");
 
