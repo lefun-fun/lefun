@@ -60,6 +60,88 @@ describe("Random", () => {
   });
 });
 
+describe("Random seed", () => {
+  test("empty seed is refused", () => {
+    expect(() => new Random({ seed: "" })).toThrow("empty seed");
+  });
+
+  test("same seed, same sequence", () => {
+    const a = new Random({ seed: "abc" });
+    const b = new Random({ seed: "abc" });
+    // More than one buffer's worth.
+    expect(a.randomInt(1000, { size: 3000 })).toEqual(
+      b.randomInt(1000, { size: 3000 }),
+    );
+  });
+
+  test("different seeds, different sequences", () => {
+    const a = new Random({ seed: "abc" });
+    const b = new Random({ seed: "abd" });
+    expect(a.uniform({ size: 10 })).not.toEqual(b.uniform({ size: 10 }));
+  });
+
+  test("no seed, different sequences", () => {
+    expect(new Random().uniform({ size: 10 })).not.toEqual(
+      new Random().uniform({ size: 10 }),
+    );
+  });
+
+  test("the sequence for a seed does not change", () => {
+    const random = new Random({ seed: "lefun" });
+    expect(random.randomInt(1000, { size: 5 })).toMatchInlineSnapshot(`
+      [
+        74,
+        383,
+        279,
+        613,
+        202,
+      ]
+    `);
+    expect(random.shuffled([1, 2, 3, 4, 5, 6])).toMatchInlineSnapshot(`
+      [
+        3,
+        2,
+        5,
+        6,
+        4,
+        1,
+      ]
+    `);
+    expect(random.uniform()).toMatchInlineSnapshot(`0.8981173788810053`);
+  });
+});
+
+describe("Random distributions", () => {
+  const random = new Random();
+
+  test("uniform is in [0, 1)", () => {
+    for (const x of random.uniform({ size: 10000 })) {
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(x).toBeLessThan(1);
+    }
+  });
+
+  test("randomInt rejects non-integers and empty ranges", () => {
+    expect(() => random.randomInt(2.5)).toThrow();
+    expect(() => random.randomInt(0)).toThrow();
+    expect(() => random.randomInt(3, 3)).toThrow();
+  });
+
+  test("shuffled is a permutation and leaves its input alone", () => {
+    const array = [1, 2, 3, 4, 5];
+    const shuffled = random.shuffled(array);
+    expect(array).toEqual([1, 2, 3, 4, 5]);
+    expect([...shuffled].sort()).toEqual(array);
+  });
+
+  test("sample with size", () => {
+    const values = random.sample([1, 2, 3, 4, 5], { size: 3 });
+    expect(values.length).toBe(3);
+    expect(new Set(values).size).toBe(3);
+    expect(random.sample([1, 2], { size: 5 }).sort()).toEqual([1, 2]);
+  });
+});
+
 describe("RandomMock", () => {
   test("fallback on Random", () => {
     const random = new RandomMock();

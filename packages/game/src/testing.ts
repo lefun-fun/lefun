@@ -14,7 +14,9 @@ import {
 import { IfAnyNull } from "@lefun/core";
 
 import {
+  BeginTurn,
   DelayedMove,
+  EndTurn,
   executeBoardMove,
   executePlayerMove,
   Stat,
@@ -391,14 +393,14 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
     stats,
   }: {
     matchHasEnded: boolean;
-    beginTurn: Record<UserId, { expiresAt?: number }>;
-    endTurn: Record<UserId, null>;
+    beginTurn: BeginTurn;
+    endTurn: EndTurn;
     delayedMoves: DelayedMove[];
     stats: Stat[];
   }) {
     const { meta, time } = this;
 
-    for (const [userId, { expiresAt }] of Object.entries(beginTurn)) {
+    for (const [userId, { expiresAt }] of beginTurn.entries()) {
       metaBeginTurn({
         meta,
         userId,
@@ -413,7 +415,7 @@ export class MatchTester<GS extends GameStateBase, G extends Game<GS>> {
       );
     }
 
-    for (const userId of Object.keys(endTurn)) {
+    for (const userId of endTurn.keys()) {
       metaEndTurn({ meta, userId });
       // Clear previous turn player moves for that player.
       this.delayedMoves = this.delayedMoves.filter(
