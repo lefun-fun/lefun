@@ -1,9 +1,37 @@
-import { sample, sampleSize, shuffle } from "lodash-es";
+import { ChaChaStream } from "./chachaStream";
+import { fisherYates } from "./fisherYates";
+import { randomBelow, randomFloat } from "./uniform";
 
+/*
+ * Cryptographically secure randomness: everything is drawn from a ChaCha20 keystream.
+ *
+ * The key is random, unless a `seed` is given, in which case the sequence is
+ * reproducible. The sequence for a given seed is part of the API: changing it changes
+ * every seeded test and replay.
+ */
 export class Random {
+  #stream: ChaChaStream;
+
+  constructor({ seed }: { seed?: string } = {}) {
+    // Most likely an empty environment variable, and it would silently give a
+    // predictable stream.
+    if (seed === "") {
+      throw new Error("empty seed: omit it for a random key");
+    }
+    this.#stream =
+      seed === undefined
+        ? ChaChaStream.withRandomKey()
+        : ChaChaStream.fromSeed(seed);
+  }
+
+  #uint32 = () => this.#stream.uint32();
+
+  #below = (n: number) => randomBelow(this.#uint32, n);
+
   shuffled<T>(array: readonly T[]): T[] {
-    // Use loadash for this one.
-    return shuffle(array);
+    const result = [...array];
+    fisherYates(result, this.#below);
+    return result;
   }
 
   sample<T>(array: readonly T[]): T;
@@ -13,13 +41,13 @@ export class Random {
       throw new Error("can not sample from empty array");
     }
     if (size === undefined) {
-      const item = sample(array);
-      if (item === undefined) {
-        throw new Error("lodash sample returned undefined");
-      }
-      return item;
+      return array[this.#below(array.length)]!;
     }
-    return sampleSize(array, size);
+    // Like lodash's `sampleSize`, `size` is clamped.
+    const n = Math.max(0, Math.min(size, array.length));
+    const pool = [...array];
+    fisherYates(pool, this.#below, n);
+    return pool.slice(0, n);
   }
 
   dice(n: number): number;
@@ -60,6 +88,10 @@ export class Random {
       max = arg1;
     }
 
+    if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max)) {
+      throw new RangeError(`randomInt expects integers, got ${min} and ${max}`);
+    }
+
     let size = 1;
     let many = false;
     if (typeof arg1 === "object" && typeof arg1.size === "number") {
@@ -72,7 +104,7 @@ export class Random {
 
     const values = Array(size)
       .fill(undefined)
-      .map(() => Math.floor(Math.random() * (max - min)) + min);
+      .map(() => min + this.#below(max - min));
 
     if (!many) {
       const first = values[0];
@@ -89,11 +121,11 @@ export class Random {
   uniform(arg0: { size: number }): number[];
   uniform({ size }: { size?: number } = {}): number | number[] {
     if (size === undefined) {
-      return Math.random();
+      return randomFloat(this.#uint32);
     }
     return Array(size)
       .fill(undefined)
-      .map(() => Math.random());
+      .map(() => randomFloat(this.#uint32));
   }
 
   bernoulli(p?: number): boolean;
